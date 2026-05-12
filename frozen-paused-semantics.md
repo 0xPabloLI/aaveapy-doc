@@ -266,6 +266,43 @@ if (params.receiveShares) {
 | receiveShares=true && frozen                | ❌ 禁止（`CannotReceiveShares`） |
 | receiveShares=true && !enabled              | ❌ 禁止（`CannotReceiveShares`） |
 
+### V4 SDK 响应中 `status` 标志实际组合分布
+
+基于对 `data/debug/v4-raw-sdk-response.json`（63 个 reserve）的分析，SDK `status` 字段返回三个标志：`active`、`frozen`、`paused`。
+
+**实际出现的组合：**
+
+| active | frozen | paused | 数量 | 占比 | 示例 |
+|--------|--------|--------|------|------|------|
+| `true` | `false` | `false` | 61 | 96.8% | 绝大多数 reserve |
+| `true` | `true` | `false` | 2 | 3.2% | Kelp spoke: WETH、rsETH |
+
+**未出现的组合：**
+
+| active | frozen | paused | 说明 |
+|--------|--------|--------|------|
+| `false` | `false` | `false` | 当前无 inactive reserve；理论上 inactive reserve 的 frozen/paused 意义不大（inactive 本身已阻止所有操作） |
+| `false` | `*` | `*` | 整个数据集中 `active=false` 未出现 |
+| `true` | `*` | `true` | 整个数据集中 `paused=true` 未出现 |
+
+**两个 frozen reserve 的详细信息：**
+
+两者均位于 **Kelp** spoke（`0x3131FE68C4722e726fe6B2819ED68e514395B9a4`，Ethereum）下：
+
+| 资产 | onChainId | status | supply APY | borrow APY | utilization |
+|------|-----------|--------|------------|------------|-------------|
+| WETH | 0 | `active=true, frozen=true, paused=false` | 1.22% | 1.91% | 74.96% |
+| rsETH | 3 | `active=true, frozen=true, paused=false` | 0% | 0% | 0% |
+
+> rsETH 的 APY 和利用率全为 0，说明刚 listing 即被 freeze；WETH 已有存借活动后被 freeze。
+> 两者均属于 LRT（Liquid Restaking Token）类别，Kelp 是 V4 上首个 LRT spoke。
+
+**对 UI 的启示：**
+
+1. **`active=false` 当前不会出现**，但代码逻辑仍需处理（合约支持 inactive 状态）
+2. **`paused=true` 当前不会出现**，但作为紧急暂停机制代码必须保留处理路径
+3. **唯一需要实际展示的状态是 `frozen=true`**（Kelp WETH/rsETH），UI 应渲染 ❄️ Frozen 状态
+
 ### V4 四标志 × 七操作的完整矩阵
 
 基于对 `Spoke.sol` 全部 validate 函数的逐行分析：
