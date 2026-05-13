@@ -112,7 +112,7 @@ aave-v4/
 | `field-glossary.md` | 知识 | API 字段 → 前端展示概念对照表 |
 | `v3-v4-sdk-field-mapping.md` | 知识 | V3/V4 SDK 字段来源 → API 输出映射 |
 | `v3-v4-incentive-matching.md` | 知识 | V3/V4 激励匹配问题分析 |
-| `v3-v4-precision-unification-plan.md` | 知识 | 精度统一执行方案 |
+| `v3-v4-precision-unification-plan.md` | 知识 | V3/V4 精度统一执行方案（✅ completed）— 百分比统一 number/%、金额 string/number 双精度、消除 RAY/bps 人工换算；后端 4 commit + 前端 4 commit + 2026-05 cleanup 均已完成 |
 | `isActive-前端实施计划.md` | 知识 | isActive 字段实施计划（✅ 已实施） |
 
 ## 跨项目文档引用
@@ -124,7 +124,7 @@ aave-v4/
 | `aave-protocol-analysis/docs/api/api-documentation.md` | API 完整定义 | 后端项目专属，→ 知识参考 `field-glossary.md` |
 | `aave-protocol-analysis/docs/api/native-apr-calculation.md` | Native APR 计算 | 后端项目专属，→ 知识参考 `aave-supply-borrow-rate-formula.md` |
 | `aave-protocol-analysis/docs/backend/oracle-price-service.md` | Oracle 价格服务 | 后端项目专属，→ 知识参考 `AaveOracle-Price-Fetch.md` |
-| `aave-protocol-analysis/docs/backend/data-precision-comparison.md` | SDK vs RPC 精度对比 | 后端项目专属，→ 知识参考 `v3-v4-precision-unification-plan.md` |
+| `aave-protocol-analysis/docs/backend/data-precision-comparison.md` | SDK vs RPC 精度对比 | 后端项目专属，→ 参考 CODEBASE-INDEX 精度统一摘要 |
 | `aave-protocol-analysis/docs/changes/v4-sdk-embedded-rewards.md` | V4 SDK 内嵌奖励说明 | 后端项目专属 |
 | `aave-protocol-analysis/docs/changes/pro-aave-v4-deeplinks.md` | V4 Deeplink 生成 | 后端项目专属 |
 | `aave-v4/docs/overview.md` | V4 协议架构总览 | 合约项目专属 |
