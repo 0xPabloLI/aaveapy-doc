@@ -153,8 +153,8 @@ vars.currentLiquidityRate = vars
 | `tokenName` | 外部元数据 | — | Token 名称，链下元数据 |
 | `tokenSymbol` | 外部元数据 | — | Token 符号，链下元数据 |
 | `tokenAddress` | Hub 共享 | §1.1 `underlying` | 底层 token 地址，同一 Asset 所有 Spoke 共享 |
-| `aTokenAddress` | Spoke 独有 | §2.1 TokenizationSpoke | aToken 合约地址，每个 Spoke 各自部署 |
-| `vTokenAddress` | Spoke 独有 | §2.1 TokenizationSpoke | vToken 合约地址，每个 Spoke 各自部署 |
+| `aTokenAddress` | V4 不存在（null） | §2.1 TokenizationSpoke | V3 独立 aToken 合约；V4 由 TokenizationSpoke（ERC-4626 vault）的 share token 等价替代，SDK 不暴露 |
+| `vTokenAddress` | V4 不存在（null） | — | V3 独立 vToken 合约；V4 无独立债务 token，借款通过 Spoke 内部 drawnShares 记账 |
 | `aaveProReserveId` | Spoke 独有 | — | Aave Pro Reserve ID，Spoke 级别标识 |
 | `hubId` | Hub 共享 | §1.3 | Hub 标识，同一 Hub 下所有 Spoke 共享 |
 | `hubName` | Hub 共享 | — | Hub 名称（CORE_HUB/PLUS_HUB/PRIME_HUB） |
@@ -194,7 +194,8 @@ vars.currentLiquidityRate = vars
 
 **归属统计**：
 - **Hub 共享**：15 个 — `tokenAddress`, `hubId`, `hubName`, `hubAddress`, `supplyApy`, `borrowApy`, `utilizationPct`, `decimals`, `availableLiquidity`, `totalVariableDebt`, `reserveFactor`, `variableRateSlope1`, `variableRateSlope2`, `optimalUsageRate`, `baseVariableBorrowRate`
-- **Spoke 独有**：23 个 — `reserveId`, `aTokenAddress`, `vTokenAddress`, `aaveProReserveId`, `spokeId`, `spokeName`, `spokeAddress`, `tokenPrice`, `supplyCapUsd`, `borrowCapUsd`, `supplyDisabled`, `borrowDisabled`, `isFrozen`, `isPaused`, `supplyIncentives`, `borrowIncentives`, `meritSupplys`, `meritBorrows`, `merklSupplys`, `merklBorrows`, `merklHolds`, `brevisSupplys`, `brevisBorrows`
+- **Spoke 独有**：21 个 — `reserveId`, `aaveProReserveId`, `spokeId`, `spokeName`, `spokeAddress`, `tokenPrice`, `supplyCapUsd`, `borrowCapUsd`, `supplyDisabled`, `borrowDisabled`, `isFrozen`, `isPaused`, `supplyIncentives`, `borrowIncentives`, `meritSupplys`, `meritBorrows`, `merklSupplys`, `merklBorrows`, `merklHolds`, `brevisSupplys`, `brevisBorrows`
+- **V3 仅有 / V4 为 null**：2 个 — `aTokenAddress`（V4 由 TokenizationSpoke share token 等价替代）, `vTokenAddress`（V4 无独立债务 token）
 - **双层存储**：2 个 — `reserveSizeUsd`, `deficit`
 - **外部元数据**：5 个 — `marketName`, `chainName`, `chainId`, `tokenName`, `tokenSymbol`
 
@@ -417,6 +418,26 @@ vars.currentLiquidityRate = vars
 | Oracle 地址 | `ORACLE()` | 无 |
 | 最大用户储备数 | `MAX_USER_RESERVES_LIMIT()` | 无 |
 
+### 2.4 TokenizationSpoke（ERC-4626 Vault，非 SDK 暴露层）
+
+TokenizationSpoke 与 Spoke 是**不同的合约**，地址无交集：
+
+| 维度 | Spoke | TokenizationSpoke |
+|------|-------|-------------------|
+| 合约性质 | 市场入口，用户通过 Spoke 进行 supply/borrow/withdraw | ERC-4626 vault，tokenize 单个底层资产（`asset()` 返回唯一 `ASSET` immutable） |
+| 部署粒度 | per-market（如 MAIN_SPOKE、BLUECHIP_SPOKE），一个 Spoke 管理多个 reserve | per-Hub per-Asset（如 `CORE_WETH_TOKENIZATION_SPOKE`），每个 reserve 一个实例 |
+| address-book 来源 | `AaveV4Ethereum.SPOKES`（11 个） | `AaveV4Ethereum.TOKENIZATION_SPOKES`（31 个） |
+| SDK 暴露 | GraphQL `Reserve.spoke` → `{id, name, address}` | **不暴露**，GraphQL schema 中无 `TokenizationSpoke` 实体 |
+| 本项目使用 | `spokeAddress` → oracle 价格查询 | 仅 address-book 有地址，代码未直接使用 |
+
+V3 vs V4 供应/债务凭证对比：
+
+| 概念 | Aave V3 | Aave V4 |
+|------|---------|---------|
+| 供应凭证 token | aToken（独立 ERC20） | TokenizationSpoke 的 share token（ERC20Upgradeable，同时是 ERC-4626 vault share） |
+| 借款凭证 token | vToken / variableDebtToken（独立 ERC20） | 无独立 token，Spoke 内部 `UserPosition.drawnShares` 记账 |
+| 余额计算 | `aToken.balanceOf(user)` | `TokenizationSpoke.balanceOf(user)`（share tokens） |
+
 ---
 
 ## 三、参数共享关系总结
@@ -491,7 +512,7 @@ vars.currentLiquidityRate = vars
 |-----------|-----------|------|
 | Hub（查询 Asset/SpokeData 参数） | 有 | `AaveV4EthereumHubs` |
 | Spoke（查询 Reserve/UserPosition 参数） | 有 | `AaveV4EthereumSpokes` |
-| TokenizationSpoke | 有 | `AaveV4EthereumTokenizationSpokes` |
+| TokenizationSpoke | 有 | `AaveV4EthereumTokenizationSpokes`（ERC-4626 vault，per-Hub per-Asset 部署，share token 等价 V3 aToken；SDK 不暴露此层） |
 | AaveOracle（Spoke 的 Oracle） | 有 | `AaveV4EthereumSpokes` 中的 `_SPOKE_ORACLE` |
 | AccessManager | 有 | `AaveV4Ethereum` |
 | HubConfigurator / SpokeConfigurator | 有 | `AaveV4Ethereum` |
