@@ -1,5 +1,7 @@
 Frozen / Paused 语义对比（V3 vs V4）
 
+> **相关文档**：[v4-hub-spoke-status-query.md](./v4-hub-spoke-status-query.md) — Hub/Spoke 状态查询方法（GraphQL 查询语法、hubId 格式、canXxx 字段、Position Manager 权限）
+
 本文档记录 Aave V3 和 V4 中 `isFrozen`、`isPaused` 和 `borrowingEnabled` 标志的精确语义差异，
 作为 [FrozenStatusBadge](../../src/components/dashboard/FrozenStatusBadge.tsx) 组件的设计参考。
 
