@@ -49,6 +49,39 @@
 - **Total Borrow APY** = `borrowApy - sum(borrowIncentives) - sum(meritBorrows) - sum(merklBorrows) - sum(brevisBorrows)`
 - **Spread** = `totalSupplyApy - totalBorrowApy`
 
+### Spread 完整展开
+
+$$Spread = totalSupplyApy - totalBorrowApy$$
+
+展开为各组成元素：
+
+| 侧 | 元素 | 来源 | 对 Spread 的贡献方向 | 说明 |
+|----|------|------|---------------------|------|
+| **Supply** | `supplyApy` | 链上合约/SDK | **正向** (+) | 基础供应 APY，V3 由 `SupplyRate = BorrowRate × supplyUsageRatio × (1-reserveFactor)` 算出；V4 由 exchange rate 年化增长率隐式表达 |
+| | `sum(supplyIncentives)` | Aave 协议奖励 | **正向** (+) | Aave 协议供应激励 APR→APY |
+| | `sum(meritSupplys)` | Merit (ACI) API | **正向** (+) | ACI 供应激励 |
+| | `sum(merklSupplys)` | Merkl API | **正向** (+) | Merkl 供应激励 |
+| | `sum(brevisSupplys)` | Brevis API | **正向** (+) | Brevis 供应激励 |
+| **Borrow** | `borrowApy` | 链上合约/SDK | **负向** (-) | 基础借款 APY，由利率曲线分段函数算出 |
+| | `sum(borrowIncentives)` | Aave 协议奖励 | **正向** (+) | Aave 协议借款激励（从 borrow APY 扣减→Spread 增大） |
+| | `sum(meritBorrows)` | Merit (ACI) API | **正向** (+) | ACI 借款激励（同上） |
+| | `sum(merklBorrows)` | Merkl API | **正向** (+) | Merkl 借款激励（同上） |
+| | `sum(brevisBorrows)` | Brevis API | **正向** (+) | Brevis 借款激励（同上） |
+
+**影响 `supplyApy` / `borrowApy` 链上层公式的因素**（间接影响 Spread）：
+
+| 因素 | 版本 | 对 supplyApy 的影响 | 对 borrowApy 的影响 |
+|------|------|-------------------|-------------------|
+| **deficit** (坏账) | V3 | 膨胀 supplyUsageRatio 分母→压低 | 不影响 |
+| **deficit** (坏账) | V4 | 分子减小 + 分母膨胀→双重打击 | 不影响（策略参数虽传入但被忽略） |
+| **reserveFactor** / **liquidityFee** | V3/V4 | 乘 `(1-factor)` 扣减→降低 | 不影响 |
+| **premium** (风险溢价) | V4 only | `P+P_offset` 增大分子→提升 | 不直接影响（但提高借款人等效利率） |
+| **F_acc** (累计协议费用) | V4 only | 从 totalAddedAssets 扣减→分母减小→提升 | 不影响 |
+| **swept** (再投资抽走流动性) | V4 only | 出现在利用率分母→影响 borrowRate→间接影响 | 增大分母→降低 |
+| **利率曲线参数** (slope1/slope2/optimal/base) | V3/V4 | 决定 borrowRate→间接决定 supplyRate | 直接决定 |
+
+> 详细公式见 [aave-supply-borrow-rate-formula.md](aave-supply-borrow-rate-formula.md)，deficit 分析见 [deficit-analysis.md](deficit-analysis.md)。
+
 ---
 
 ## 四、状态/标识字段

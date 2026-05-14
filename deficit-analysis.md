@@ -1,4 +1,142 @@
-# Aave V4 Hub & Spoke 参数与查询手册
+# Aave Deficit 分析手册（V3 + V4）
+
+---
+
+# Part 1：Aave V3 Deficit 机制
+
+## 1. Deficit 定义
+
+Deficit（坏账）是清算过程中产生的资金缺口：当抵押品价值不足以偿还债务时，差额计入 deficit。
+
+| 属性 | 说明 |
+|------|------|
+| 存储 | `reserve.deficit`（per reserve，单层存储，无 Hub/Spoke 双层） |
+| 单位 | underlying token units |
+| 数据获取 | `Pool.getReserveData(asset)` → `deficit` 字段；或 `UiPoolDataProviderV3.getReservesHumanized()` |
+| fallback | RPC 失败时默认 `"0"` |
+
+## 2. 产生机制
+
+清算时，被清算用户的 debt token 被销毁，但 collateral token 不够覆盖债务：
+
+```
+用户抵押品价值 < 用户债务
+→ 清算后差额 = 债务 - 实际收回抵押品价值
+→ 差额计入 reserve.deficit
+```
+
+常见触发场景：
+- 价格剧烈波动导致抵押品价值骤降
+- 清算延迟导致抵押品进一步贬值
+- 闪电崩盘中清算机器人无法及时执行
+
+## 3. 对利率的影响
+
+### 3.1 核心公式
+
+Deficit **只出现在 `supplyUsageRatio` 的分母中**，压低存款利率：
+
+**Borrow Rate 的利用率（不受 deficit 影响）：**
+
+$$borrowUsageRatio = \frac{totalDebt}{totalDebt + availableLiquidity}$$
+
+**Supply Rate 的利用率（受 deficit 影响）：**
+
+$$supplyUsageRatio = \frac{totalDebt}{totalDebt + availableLiquidity + deficit}$$
+
+**Supply Rate 换算公式：**
+
+$$Supply\ Rate = BorrowRate \times supplyUsageRatio \times \left(1 - \frac{reserveFactor}{10000}\right)$$
+
+### 3.2 影响效果
+
+| 场景 | 效果 |
+|------|------|
+| deficit = 0 | `supplyUsageRatio = borrowUsageRatio`，两者相等 |
+| deficit > 0 | 分母变大 → `supplyUsageRatio` 变小 → Supply Rate 降低 |
+| deficit 极大 | `supplyUsageRatio → 0`，存款利率趋近于零 |
+
+**关键**：deficit **只惩罚存款人**，borrow rate 完全不受影响（借款人该付多少还是付多少）。
+
+### 3.3 合约源码溯源
+
+参数组装（`ReserveLogic.sol`）：
+
+```solidity
+(uint256 nextLiquidityRate, uint256 nextVariableRate) =
+    IReserveInterestRateStrategy(interestRateStrategyAddress)
+    .calculateInterestRates(
+        DataTypes.CalculateInterestRatesParams({
+            unbacked: reserve.deficit,        // ← deficit 作为 unbacked 传入
+            liquidityAdded: liquidityAdded,
+            liquidityTaken: liquidityTaken,
+            totalDebt: totalVariableDebt,
+            reserveFactor: reserveCache.reserveFactor,
+            reserve: reserveAddress,
+            usingVirtualBalance: true,
+            virtualUnderlyingBalance: reserve.virtualUnderlyingBalance
+        })
+    );
+```
+
+利率计算（`DefaultReserveInterestRateStrategyV2.sol`）：
+
+```solidity
+vars.availableLiquidity =
+    params.virtualUnderlyingBalance +
+    params.liquidityAdded -
+    params.liquidityTaken;
+
+vars.availableLiquidityPlusDebt = vars.availableLiquidity + params.totalDebt;
+
+// Borrow rate 利用率（无 deficit）
+vars.borrowUsageRatio = params.totalDebt.rayDiv(vars.availableLiquidityPlusDebt);
+
+// Supply rate 利用率（含 deficit）
+vars.supplyUsageRatio = params.totalDebt.rayDiv(
+    vars.availableLiquidityPlusDebt + params.unbacked
+);
+
+// 换算公式
+vars.currentLiquidityRate = vars
+    .currentVariableBorrowRate
+    .rayMul(vars.supplyUsageRatio)
+    .percentMul(PercentageMath.PERCENTAGE_FACTOR - params.reserveFactor);
+```
+
+## 4. 数值示例
+
+| 场景 | deficit | supplyUsageRatio | Supply Rate | 相对无坏账 |
+|------|---------|-----------------|------------|-----------|
+| 无坏账 | 0 | 800/1000 = 0.800 | 3.60% | 基准 |
+| 有坏账 | 100 | 800/1100 = 0.727 | 3.27% | -9.2% |
+| 严重坏账 | 400 | 800/1400 = 0.571 | 2.57% | -28.6% |
+
+（假设 Borrow Rate = 5%，reserveFactor = 10%，totalDebt = 800，availableLiquidity = 200）
+
+## 5. 合约查询路径
+
+| 合约 | 函数 | 获取内容 |
+|------|------|----------|
+| `Pool` | `getReserveData(asset)` | `deficit`, `currentLiquidityRate`, `currentVariableBorrowRate` |
+| `UiPoolDataProviderV3` | `getReservesData(provider)` | 批量获取所有资产数据（含 deficit） |
+| `AaveProtocolDataProvider` | `getReserveData(asset)` | `liquidityRate`, `variableBorrowRate` |
+
+## 6. V3 vs V4 Deficit 对比速查
+
+| 概念 | Aave V3 | Aave V4 |
+|------|---------|---------|
+| 存储层级 | 单层：`reserve.deficit`（per reserve） | 双层：`Asset.deficitRay`（Hub 聚合）+ `SpokeData.deficitRay`（per spoke） |
+| 不变量 | 无 | `Asset.deficitRay = Σ SpokeData.deficitRay` |
+| 对 Supply APY 影响 | 仅膨胀分母（supplyUsageRatio） | 双重打击：分子减小（drawShares↓）+ 分母膨胀 |
+| 对 Borrow APY 影响 | 不影响 | 不影响（策略参数虽传入但被 `/* deficit */` 注释忽略） |
+| 产生 | 清算后资不抵债 → 计入 reserve.deficit | `reportDeficit()` → Hub 双层级同步递增 |
+| 消除 | 无原生机制（需治理处理） | `eliminateDeficit()` → addedShares 销毁 + deficit 双层级递减 |
+| 跨 spoke 消除 | 不适用 | 支持（caller spoke 和 covered spoke 可不同） |
+
+---
+
+# Part 2：Aave V4 Hub & Spoke 参数与查询手册
 
 ---
 
