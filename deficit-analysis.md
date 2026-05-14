@@ -158,7 +158,8 @@ vars.currentLiquidityRate = vars
 |------|---------|---------|
 | 存储层级 | 单层：`reserve.deficit`（per reserve） | 双层：`Asset.deficitRay`（Hub 聚合）+ `SpokeData.deficitRay`（per spoke） |
 | 不变量 | 无 | `Asset.deficitRay = Σ SpokeData.deficitRay` |
-| 对 Supply APY 影响 | 仅膨胀分母（supplyUsageRatio） | 双重打击：分子减小（drawShares↓）+ 分母膨胀 |
+| 清算后债务处理 | `totalDebt` 减少（债务 token 销毁），差额存入 `deficit` | `drawnShares` 减少（份额核销），差额计入 `deficitRay`（满足 `drawnShares↓ = deficitRay↑`） |
+| 对 Supply APY 影响 | **数学等价**：supplyUsageRatio 分子=清算后剩余债务，分母+deficit | **数学等价**：supplyUsageRatio 分子=清算后剩余债务，分母+deficitRay |
 | 对 Borrow APY 影响 | 不影响 | 不影响（策略参数虽传入但被 `/* deficit */` 注释忽略） |
 | 产生 | 清算后资不抵债 → 计入 reserve.deficit | `reportDeficit()` → Hub 双层级同步递增 |
 | 消除 | 无原生机制（需治理处理） | `eliminateDeficit()` → addedShares 销毁 + deficit 双层级递减 |

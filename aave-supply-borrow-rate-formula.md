@@ -793,14 +793,22 @@ $\ell$ 是「税率」，$F_{acc}$ 是「历年已缴税款累积总额」。
 
 ### 7.3 对 Supply APY 的影响
 
-产生 deficit 后：
+清算产生 deficit 时，债务被核销（V3: `totalDebt` 减少；V4: `drawnShares` 减少），差额计入 deficit。
 
-```
-分子：drawShares ↓ → (D + P + P_offset) ↓ → 利息产出降低
-分母：deficitRay  ↑ → 分母膨胀 → U_eff 降低
+**对 supplyUsageRatio 的影响（V3 与 V4 数学等价）**：
 
-双重打击 = Supply APY 明显下降
-```
+| 版本 | 分子 | 分母 |
+|------|------|------|
+| V3 | `totalDebt`（清算后的剩余债务） | `totalDebt + availableLiquidity + deficit` |
+| V4 | `drawnShares × drawnIndex`（清算后的剩余债务） | `drawnShares × drawnIndex + liquidity + deficitRay` |
+
+**数学结果相同**：分子都是清算后的有效债务，分母都包含 deficit。
+
+**V3 vs V4 的区别**仅在会计路径：
+- V3：`totalDebt` 和 `deficit` 是两个独立变量，清算后 `totalDebt↓`，差额存入 `deficit`
+- V4：`drawnShares↓` 和 `deficitRay↑` 在 shares 系统中等量转换，满足不变量
+
+**经济学意义**：deficit 对应的债务无借款人支付利息，供应者通过降低的 supply APY 承担损失。
 
 ## 8. 正向与反向换算
 

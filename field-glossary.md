@@ -72,8 +72,8 @@ $$Spread = totalSupplyApy - totalBorrowApy$$
 
 | 因素 | 版本 | 对 supplyApy 的影响 | 对 borrowApy 的影响 |
 |------|------|-------------------|-------------------|
-| **deficit** (坏账) | V3 | 膨胀 supplyUsageRatio 分母→压低 | 不影响 |
-| **deficit** (坏账) | V4 | 分子减小 + 分母膨胀→双重打击 | 不影响（策略参数虽传入但被忽略） |
+| **deficit** (坏账) | V3 | 清算后 totalDebt 减少，差额存入 deficit → 分母膨胀 | 不影响 |
+| **deficit** (坏账) | V4 | 清算后 drawnShares 减少，差额计入 deficitRay → 数学等价 V3 | 不影响（策略参数虽传入但被忽略） |
 | **reserveFactor** / **liquidityFee** | V3/V4 | 乘 `(1-factor)` 扣减→降低 | 不影响 |
 | **premium** (风险溢价) | V4 only | `P+P_offset` 增大分子→提升 | 不直接影响（但提高借款人等效利率） |
 | **F_acc** (累计协议费用) | V4 only | 从 totalAddedAssets 扣减→分母减小→提升 | 不影响 |
