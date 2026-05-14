@@ -112,8 +112,24 @@ aave-v4/
 | `field-glossary.md` | 知识 | API 字段 → 前端展示概念对照表 |
 | `v3-v4-sdk-field-mapping.md` | 知识 | V3/V4 SDK 字段来源 → API 输出映射 |
 | `v3-v4-incentive-matching.md` | 知识 | V3/V4 激励匹配问题分析 |
-| `v3-v4-precision-unification-plan.md` | 知识 | V3/V4 精度统一执行方案（✅ completed）— 百分比统一 number/%、金额 string/number 双精度、消除 RAY/bps 人工换算；后端 4 commit + 前端 4 commit + 2026-05 cleanup 均已完成 |
 | `isActive-前端实施计划.md` | 知识 | isActive 字段实施计划（✅ 已实施） |
+
+## 本地开发环境
+
+三个 repo 通过 symlink 共享文档：
+
+```
+some-directory/
+├── aaveapy/aaveapy-doc                  → ../aaveapy-doc (symlink)
+├── aave-protocol-analysis/aaveapy-doc   → ../aaveapy-doc (symlink)
+└── aaveapy-doc/                          ← 文档源
+```
+
+**一键克隆**：运行 `./clone-all.sh [目标目录]` 即可同时克隆三个 repo。
+
+```bash
+cd aaveapy-doc && ./clone-all.sh ~/code
+```
 
 ## 跨项目文档引用
 
