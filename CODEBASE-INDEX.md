@@ -105,7 +105,7 @@ aave-v4/
 
 | 文档 | 类型 | 说明 |
 |------|------|------|
-| `frozen-paused-semantics.md` | 知识 | V3/V4 frozen/paused/active/halted 完整语义对比（合约源码 + SDK 响应 + UI 规范 + 两个 active 字段的混淆） |
+| `frozen-paused-semantics.md` | 知识 | V3/V4 frozen/paused/active/halted 完整语义对比（合约源码 + SDK 响应 + UI 规范 + 两个 active 字段的混淆 + Hub/Spoke 级联关系 + Spoke/TokenizationSpoke 并列共存） |
 | `aave-supply-borrow-rate-formula.md` | 知识 | V3/V4 Supply/Borrow Rate 换算公式 |
 | `AaveOracle-Price-Fetch.md` | 知识 | V3/V4 Oracle 价格批量获取方案 |
 | `deficit-analysis.md` | 知识 | V4 Hub & Spoke 参数与查询手册（含 deficit 双层追踪机制） |

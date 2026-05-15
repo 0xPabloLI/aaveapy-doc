@@ -400,6 +400,68 @@ if (params.receiveShares) {
 | aToken 转账       | 独立操作，只检查 `isPaused`（连 `isActive` 都不查）             | V4 无 aToken，位置（position）直接由 Spoke 管理               |
 | 清算时接收方式         | 清算人直接获得底层资产或 aToken                                | 清算人可选 receiveShares（受 `frozen` + `receiveSharesEnabled` 约束） |
 
+### 3.7 Hub active/halted 与 Spoke frozen/paused 的级联关系
+
+**核心结论：两套状态完全解耦，不存在协议层的自动级联。**
+
+| 维度 | Hub `active`/`halted` | Spoke `frozen`/`paused` |
+|---|---|---|
+| 存储位置 | Hub 合约 `_spokes[assetId][spoke]` | Spoke 合约 `_reserves[reserveId].flags` |
+| 控制对象 | Spoke 能否与 Hub 交互（add/remove/draw/restore） | 用户能否与 Spoke 交互（supply/borrow/withdraw/repay） |
+| 设置者 | `HubConfigurator` | `SpokeConfigurator` |
+| 级联方向 | **无** — 设置 halted 不会触发 frozen/paused | **无** — 设置 frozen/paused 不影响 active/halted |
+
+- Hub 的 `haltAsset`/`haltSpoke` 仅在 Hub 上设置 `halted=true`，**不会**自动触发 Spoke 上的 `frozen` 或 `paused`
+- Hub 的 `deactivateAsset`/`deactivateSpoke` 仅在 Hub 上设置 `active=false`，**不会**自动触发 Spoke 上的任何状态变化
+- 反之亦然，Spoke 的 `freezeReserve`/`pauseReserve` **不会**影响 Hub 上的 `active`/`halted`
+
+**TokenizationSpoke 的特殊行为**：TokenizationSpoke 不维护自身的 frozen/paused，而是直接读取 Hub 的 `SpokeConfig`：
+
+```solidity
+// TokenizationSpoke.sol — maxDeposit / _maxRemovableAssets
+IHub.SpokeConfig memory config = HUB.getSpokeConfig(ASSET_ID, address(this));
+if (!config.active || config.halted) {
+    return 0;  // Hub 侧不 active 或 halted 时，ERC4626 vault 的 max 操作返回 0
+}
+```
+
+这是唯一一处 Hub 状态直接"穿透"到 Spoke 侧行为的逻辑，但它通过 ERC4626 的 `maxDeposit`/`maxWithdraw` 返回 0 实现，而非设置 spoke 的 frozen/paused 标志。
+
+**治理层协调**：若需"hub halted → spoke frozen"的级联效果，只能通过 `AaveV4ConfigEngine` 的 payload 在**同一笔交易**中同时调用 `HubConfigurator.haltAsset` + `SpokeConfigurator.freezeAllReserves`，属于治理层的协调而非协议层的自动级联。
+
+### 3.8 Spoke 与 TokenizationSpoke：同一 Asset 上的两种并列 Spoke
+
+V4 中 **同一个 assetId 可以同时注册两种不同类型的 spoke**，它们都往同一个 Hub 的同一个 asset 存流动性，但职责不同：
+
+```
+                    Hub（流动性集中层）
+              _spokes[assetId][spokeAddress]
+               ┌──────┴──────┐
+          Spoke(A)      TokenizationSpoke(B)
+         借贷 spoke         ERC4626 vault spoke
+```
+
+| 维度 | Spoke | TokenizationSpoke |
+|---|---|---|
+| 合约性质 | 市场入口，处理 supply/borrow/repay/withdraw/liquidation | ERC4626 vault，tokenize 单个底层资产的供应份额 |
+| Hub 操作 | add + remove + draw + restore（全功能） | add + remove only（drawCap=0，纯供应） |
+| 部署粒度 | per-market（如 MAIN_SPOKE 管理 10+ reserves） | per-Hub per-Asset（每个 asset 一个实例） |
+| share token | 无独立 ERC20，Spoke 内部 UserPosition.suppliedShares 记账 | 自身即 ERC20Upgradeable（ERC4626 vault share），等价 V3 aToken |
+| 状态控制 | Spoke 侧 frozen/paused + Hub 侧 active/halted | 无 frozen/paused，直接读 Hub SpokeConfig |
+| Hub 注册 | `addSpoke(assetId, spokeA, SpokeConfig{addCap, drawCap>0, ...})` | `addSpoke(assetId, spokeB, SpokeConfig{addCap, drawCap=0, riskPremiumThreshold=0, ...})` |
+
+**流动性汇聚机制**：用户从 Spoke supply 和从 TokenizationSpoke deposit 的流动性，最终都汇聚到 Hub 的同一个 asset 池子：
+
+- Spoke.supply → `IERC20.transferFrom(user, hub)` + `Hub.add(assetId, amount)`
+- TokenizationSpoke.deposit → `IERC20.transferFrom(user, hub)` + `Hub.add(assetId, amount)`
+
+Hub 通过 `msg.sender`（spoke 地址）区分两者的独立 `SpokeData` 记账，各自的 `addedShares`、`drawCap`、`deficitRay` 独立追踪，但共享同一个 `Asset` 层的 `liquidity`、`drawnIndex`、`drawnRate`——因此两者共享利率和流动性池。
+
+**实际部署规模**（Ethereum Mainnet，aave-address-book v4.49.0+）：
+- Spoke：11 个（`AaveV4Ethereum.SPOKES`）
+- TokenizationSpoke：31 个（`AaveV4Ethereum.TOKENIZATION_SPOKES`）
+- SDK 暴露：仅 Spoke（GraphQL `Reserve.spoke`），TokenizationSpoke 不暴露
+
 ***
 
 ## 四、UI 实现规范
