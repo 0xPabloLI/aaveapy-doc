@@ -189,6 +189,45 @@ $$variableBorrowRate = baseVariableBorrowRate + variableRateSlope1 + variableRat
 
 策略参数可通过 `DefaultReserveInterestRateStrategyV2.getInterestRateDataBps(reserve)` 查询。
 
+### 利率参数全零与借款禁用的关系（V3 vs V4）
+
+基于 2026-05-15 实测数据分析。
+
+#### 强条件：baseBorrowRate = 0 AND slope1 = 0 AND slope2 = 0 → 一定被禁用
+
+当利率曲线三个参数全为 0 时，borrowRate 在**任意利用率**下恒为 0，即真正意义上的零成本无限借款。治理不可能允许此情况存在。
+
+**V3**：不存在三参数全零的 reserve（共 0 个）。V3 即使设 baseBorrowRate=0，至少有一个 slope > 0，利率曲线仍可工作。
+
+**V4**：三参数全零的 reserve 共 19 个，全部被禁用：
+
+| 禁用方式 | 案例 | 数量 |
+|---------|------|------|
+| `borrowDisabled=true`（即 `borrowable=false`） | AAVE, LINK, WBTC, WETH, wstETH, weETH, sUSDe, XAUt, PT-* 等 | 18 |
+| `isFrozen=true` | rsETH (Kelp) | 1 |
+
+> 三参数全零是 borrowDisabled/frozen 的**充分条件**（当前数据无反例）。
+
+#### 弱条件：仅 baseBorrowRate = 0 → 不一定被禁用
+
+**V4**：V4 中 baseBorrowRate=0 的可借资产仍有借款能力，因为 slope > 0，利用率上来后 rate 被 slope 推高。但 V4 中 baseBorrowRate=0 且 slope 也为 0 的资产全部被禁用（见上）。
+
+**V3**：大量 `baseBorrowRate=0` 且可正常借款的资产（DAI, USDC, WETH, USDT, GHO 等），因为 slope1/slope2 > 0，利用率 > 0 时 `borrowRate = slope1 × (U/U_optimal) > 0`。
+
+#### 设计解读
+
+- `baseBorrowRate=0` 仅表示**利用率=0 时**借款成本为零，一旦有人借款利率曲线即推高 rate，不是"零成本借款"
+- 三参数全零 = **利率曲线退化为常零函数**，borrowRate 在任意利用率下恒为 0，治理必须禁用
+- V3 不存在三参数全零的 reserve，不是因为合约限制，而是治理选择：V3 单层架构下全零利率曲线是明显的零成本无限借款漏洞，治理不会这么配
+- V4 存在全零利率曲线是因为 V4 的多 Hub 架构允许**同一资产在不同 Hub 上有不同利率配置**：
+
+| 资产 | Hub | base | slope1 | slope2 | borrowable | 含义 |
+|------|-----|------|--------|--------|------------|------|
+| WETH | Core (Main) | 0 | 2.35 | 14 | true | 正常借贷 |
+| WETH | Prime (Bluechip) | 0 | 0 | 0 | false | 该 Hub 不支持 WETH 借款 |
+
+V4 的利率曲线粒度是 **per (hub, asset)**，不是 per reserve 也不是 per spoke。全零利率曲线 + borrowable=false 的实质是：**该资产在这个 Hub 上不提供借款功能**，是 Hub 级别的"不参与借贷"声明，配合 borrowable=false 双重保险。同一资产在另一个 Hub 可以有正常利率曲线和借款能力。
+
 ## 7. 合约公式换算示例
 
 ### 示例参数
