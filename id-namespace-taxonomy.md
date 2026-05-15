@@ -23,37 +23,57 @@
 
 ## 二、层级关系图
 
+### 2.1 Hub → Asset → Spoke 归属
+
+```mermaid
+graph TD
+    subgraph HubA["Hub A (hubAddress_A)"]
+        A0["assetId=0 (WETH)<br/>_assets[0]"]
+        A1["assetId=1 (USDC)<br/>_assets[1]"]
+        A2["assetId=2 (WBTC)<br/>_assets[2]"]
+    end
+    subgraph HubB["Hub B (hubAddress_B)"]
+        B0["assetId=0 (WETH) ⚠️<br/>_assets[0]"]
+        B1["assetId=1 (GHO)<br/>_assets[1]"]
+    end
+
+    A0 --> S1A0["Spoke S1<br/>_spokes[0][S1]"]
+    A0 --> S2A0["Spoke S2<br/>_spokes[0][S2]"]
+    A0 --> S3A0["Spoke S3<br/>_spokes[0][S3]"]
+    A1 --> S1A1["Spoke S1<br/>_spokes[1][S1]"]
+    A1 --> S2A1["Spoke S2<br/>_spokes[1][S2]"]
+    A2 --> S1A2["Spoke S1<br/>_spokes[2][S1]"]
+
+    B0 --> S4B0["Spoke S4<br/>_spokes[0][S4]"]
+    B1 --> S4B1["Spoke S4<br/>_spokes[1][S4]"]
+
+    style B0 fill:#ffcccc,stroke:#cc3333
 ```
-Hub A (hubAddress_A)
- ├── assetId=0 (WETH)  ← _assets[0]
- │    ├── Spoke S1 (spokeAddress_S1) → _spokes[0][S1].deficitRay, ...
- │    ├── Spoke S2 (spokeAddress_S2) → _spokes[0][S2].deficitRay, ...
- │    └── Spoke S3 (spokeAddress_S3) → _spokes[0][S3].deficitRay, ...
- ├── assetId=1 (USDC)  ← _assets[1]
- │    ├── Spoke S1 → _spokes[1][S1]
- │    └── Spoke S2 → _spokes[1][S2]
- └── assetId=2 (WBTC)  ← _assets[2]
-      └── Spoke S1 → _spokes[2][S1]
 
-Hub B (hubAddress_B)
- ├── assetId=0 (WETH)  ← _assets[0]  ← ⚠️ 与 Hub A 的 assetId=0 不同！
- │    └── Spoke S4 → _spokes[0][S4]
- └── assetId=1 (GHO)  ← _assets[1]
-      └── Spoke S4 → _spokes[1][S4]
+> ⚠️ Hub B 的 assetId=0 与 Hub A 的 assetId=0 对应不同的 token 上下文（各 Hub 独立编号）
 
-Spoke S1 (spokeAddress_S1)
- ├── reserveId=0 → (hub=A, assetId=0, underlying=WETH)  ← _reserves[0]
- ├── reserveId=1 → (hub=A, assetId=1, underlying=USDC)  ← _reserves[1]
- └── reserveId=2 → (hub=A, assetId=2, underlying=WBTC)  ← _reserves[2]
+### 2.2 Spoke → Reserve 映射
 
-Spoke S2 (spokeAddress_S2)
- ├── reserveId=0 → (hub=A, assetId=0, underlying=WETH)  ← ⚠️ 与 S1 的 reserveId=0 不同！
- └── reserveId=1 → (hub=A, assetId=1, underlying=USDC)
+```mermaid
+graph TD
+    subgraph SpokeS1["Spoke S1 (spokeAddress_S1)"]
+        R1_0["reserveId=0<br/>hub=A, assetId=0, WETH<br/>_reserves[0]"]
+        R1_1["reserveId=1<br/>hub=A, assetId=1, USDC<br/>_reserves[1]"]
+        R1_2["reserveId=2<br/>hub=A, assetId=2, WBTC<br/>_reserves[2]"]
+    end
+    subgraph SpokeS2["Spoke S2 (spokeAddress_S2)"]
+        R2_0["reserveId=0 ⚠️<br/>hub=A, assetId=0, WETH<br/>_reserves[0]"]
+        R2_1["reserveId=1<br/>hub=A, assetId=1, USDC<br/>_reserves[1]"]
+    end
+    subgraph SpokeS4["Spoke S4 (spokeAddress_S4)"]
+        R4_0["reserveId=0<br/>hub=B, assetId=0, WETH<br/>_reserves[0]"]
+        R4_1["reserveId=1<br/>hub=B, assetId=1, GHO<br/>_reserves[1]"]
+    end
 
-Spoke S4 (spokeAddress_S4)
- ├── reserveId=0 → (hub=B, assetId=0, underlying=WETH)
- └── reserveId=1 → (hub=B, assetId=1, underlying=GHO)
+    style R2_0 fill:#ffcccc,stroke:#cc3333
 ```
+
+> ⚠️ Spoke S2 的 reserveId=0 与 S1 的 reserveId=0 对应不同的 (hub, assetId) 组合（各 Spoke 独立编号）
 
 ---
 
@@ -231,21 +251,24 @@ mapping(uint256 assetId => mapping(address spoke => IHub.SpokeData)) internal _s
 
 以 **WETH**（underlying = `0xC02a...6Cc2`）为例：
 
-```
-                  WETH (0xC02a...6Cc2)
-                  ┌──────────────────────────────────┐
-                  │                                  │
-          CORE_HUB                               PRIME_HUB
-     assetId = 0¹                            assetId = ?²
-     (假设首个添加的 asset)                   (取决于添加顺序)
-          │                                       │
-     ┌────┼────┬────┬────┐                   ┌────┘
-     │    │    │    │    │                   │
-  MAIN  BLUE LIDO ETH KELP              LOMBARD
-  SPOKE CHIP E    FI   P                BTC
-     │    │    │    │    │                   │
-  resId resId resId resId resId           resId
-  =0³  =0⁴  =0⁵  =?   =?                =0⁶
+```mermaid
+graph TD
+    WETH["WETH<br/>0xC02a...6Cc2"]
+
+    WETH --> CORE["CORE_HUB<br/>assetId = 0¹"]
+    WETH --> PRIME["PRIME_HUB<br/>assetId = ?²"]
+
+    CORE --> MAIN["MAIN_SPOKE<br/>reserveId = 0³"]
+    CORE --> BLUE["BLUECHIP_SPOKE<br/>reserveId = 0⁴"]
+    CORE --> LIDO["LIDO_E_SPOKE<br/>reserveId = 0⁵"]
+    CORE --> ETHFI["ETHERFI_E_SPOKE<br/>reserveId = ?"]
+    CORE --> KELP["KELP_E_SPOKE<br/>reserveId = ?"]
+
+    PRIME --> LOMBARD["LOMBARD_BTC_SPOKE<br/>reserveId = 0⁶"]
+
+    style CORE fill:#e6f3ff,stroke:#336699
+    style PRIME fill:#fff3e6,stroke:#996633
+    style WETH fill:#f0f0f0,stroke:#666666
 ```
 
 **脚注**：
