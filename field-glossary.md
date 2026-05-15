@@ -17,7 +17,23 @@
 | `borrowApy` | **Borrow** (Native) | Borrow 列主数值、SimulationSubRow | `number` 百分比 | 基础 Borrow APY（不含激励）。前端合计：`borrowApy - sum(borrowIncentives等)` |
 | `supplyCapUsd` | **Supply cap** / **Available to supply** / **% of cap** | CapProgressRing、SupplyCapSheet | `number` USD | 供应上限及相关派生值 |
 | `borrowCapUsd` | **Borrow cap** / **Available to borrow** / **% of cap** | BorrowCapProgressRing、BorrowCapSheet | `number` USD | 借贷上限及相关派生值 |
-| `deficit` | **Deficit** / **Deficit (%)** | Size 列（Deficit 行）、DeficitLiquidityRing | `string` raw token → 前端转为 USD + 计算占比 | 坏账。前端计算 `deficit / 10^decimals * tokenPrice` 得 USD 值，再算 `deficitUsd / (deficitUsd + totalSuppliedUsd)` 得占比 |
+| `deficit` | **Deficit** / **Deficit (%)** | Size 列（Deficit 行）、DeficitLiquidityRing | `string` raw token → 前端转为 USD + 计算占比 | 坏账。**双层存储：Hub 聚合 `Asset.deficitRay`（per asset）+ SpokeData 分量 `SpokeData.deficitRay`（per asset per spoke），无 Reserve 级别**。前端计算 `deficit / 10^decimals * tokenPrice` 得 USD 值，再算 `deficitUsd / (deficitUsd + totalSuppliedUsd)` 得占比 |
+
+---
+
+## 1.5 变量 Reserve 级别归属速查
+
+| 分类 | 变量 | 粒度 | 说明 |
+|------|------|------|------|
+| **有 Reserve 级别** | `underlying`, `hub`, `assetId`, `decimals` | per Reserve | Reserve 结构体 |
+| **有 Reserve 级别** | `collateralRisk`, `paused`, `frozen`, `borrowable`, `receiveSharesEnabled`, `dynamicConfigKey` | per Reserve | Reserve 配置 |
+| **有 Reserve 级别** | `collateralFactor`, `maxLiquidationBonus`, `liquidationFee` | per Reserve per key | 动态配置 |
+| **有 Reserve 级别** | `drawnShares`, `premiumShares`, `premiumOffsetRay`, `suppliedShares`（UserPosition） | per Reserve per User | 用户仓位 |
+| **无 Reserve 级别** | `liquidity`, `realizedFees`, `swept`, `drawnIndex`, `drawnRate`, `lastUpdateTimestamp`, `liquidityFee`, `irStrategy`, `reinvestmentController`, `feeReceiver`, `deficitRay`（Asset） | per Asset (Hub) | Hub Asset 独占 |
+| **无 Reserve 级别** | `addCap`, `drawCap`, `riskPremiumThreshold`, `active`, `halted`, `deficitRay`（SpokeData） | per Asset per Spoke | Hub SpokeData 独占 |
+| **无 Reserve 级别（双层）** | `addedShares`, `drawnShares`, `premiumShares`, `premiumOffsetRay`, `deficitRay` | Asset 聚合 + SpokeData 分量 | Asset = Σ SpokeData |
+
+**核心规律**：Spoke 端按 `reserveId` 索引的变量有 Reserve 级别；Hub 端只认识 `(assetId, spoke)`，不认识 `reserveId`，因此 Hub 侧变量均无 Reserve 级别。
 
 ---
 

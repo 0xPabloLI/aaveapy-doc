@@ -758,6 +758,92 @@ function getDrawnRate(IHub.Asset storage asset, uint256 assetId, uint256 drawnIn
 
 ---
 
+## 七、变量 Reserve 级别归属分类
+
+### 7.1 有 Reserve 级别的变量（Spoke 端）
+
+**Reserve 结构体**（`ISpoke.sol:44-53`）— per Spoke per Reserve：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `underlying` | address | 底层 token 地址 |
+| `hub` | IHubBase | 关联的 Hub 地址 |
+| `assetId` | uint16 | Hub 中的 asset ID |
+| `decimals` | uint8 | 精度（实际同 Asset 共享） |
+| `collateralRisk` | uint24 | 抵押风险 (BPS) |
+| `paused` | bool | 是否暂停（ReserveFlags） |
+| `frozen` | bool | 是否冻结（ReserveFlags） |
+| `borrowable` | bool | 是否可借（ReserveFlags） |
+| `receiveSharesEnabled` | bool | 清算是否可收 shares（ReserveFlags） |
+| `dynamicConfigKey` | uint32 | 当前动态配置 key |
+
+**DynamicReserveConfig** — per Reserve per dynamicConfigKey：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `collateralFactor` | uint16 | 抵押因子 (BPS) |
+| `maxLiquidationBonus` | uint32 | 最大清算奖金 (BPS) |
+| `liquidationFee` | uint16 | 清算手续费 (BPS) |
+
+**UserPosition**（`ISpoke.sol:95-103`）— per Reserve per User：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `drawnShares` | uint120 | 借款 shares |
+| `premiumShares` | uint120 | 溢价 shares |
+| `premiumOffsetRay` | int200 | 溢价偏移 |
+| `suppliedShares` | uint120 | 供应 shares |
+
+### 7.2 没有 Reserve 级别的变量（Hub 端）
+
+**Hub Asset 独占** — per Asset，所有 Spoke 共享：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `liquidity` | uint120 | 总可用流动性 |
+| `realizedFees` | uint120 | 已实现费用 |
+| `swept` | uint120 | 再投资抽走的流动性 |
+| `liquidityFee` | uint16 | 协议费率 (BPS) |
+| `drawnIndex` | uint120 | 债务指数（唯一，所有 Spoke 共用） |
+| `drawnRate` | uint96 | 利率 |
+| `lastUpdateTimestamp` | uint40 | 上次计息时间 |
+| `irStrategy` | address | 利率策略合约 |
+| `reinvestmentController` | address | 再投资控制器 |
+| `feeReceiver` | address | 费用接收 spoke |
+| `deficitRay` | uint200 | 总 deficit（Hub 聚合） |
+
+**Hub SpokeData 独占** — per Asset per Spoke：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `addCap` | uint40 | 供应上限 |
+| `drawCap` | uint40 | 借款上限 |
+| `riskPremiumThreshold` | uint24 | 风险溢价阈值 (BPS) |
+| `active` | bool | 是否激活 |
+| `halted` | bool | 是否暂停 |
+| `deficitRay` | uint200 | 该 spoke 的 deficit |
+
+**双层存储**（Asset 聚合 = Σ SpokeData）：
+
+| 变量 | Asset 层 | SpokeData 层 |
+|------|----------|-------------|
+| `addedShares` | per Asset 聚合 | per Asset per Spoke |
+| `drawnShares` | per Asset 聚合 | per Asset per Spoke |
+| `premiumShares` | per Asset 聚合 | per Asset per Spoke |
+| `premiumOffsetRay` | per Asset 聚合 | per Asset per Spoke |
+| `deficitRay` | per Asset 聚合 | per Asset per Spoke |
+
+### 7.3 核心规律
+
+| 规则 | 说明 |
+|------|------|
+| Spoke 端的数据有 Reserve 级别 | `Reserve` 和 `UserPosition` 结构体按 `reserveId` 索引 |
+| Hub 端的数据没有 Reserve 级别 | Hub 只认识 `(assetId, spoke)`，不认识 `reserveId` |
+| 经济量无 Reserve 级别 | deficit、shares、index、rate 等核心经济量全部在 Hub 侧 |
+| 同一 Asset 可对应多个 Reserve | 同一 Hub assetId 在不同 Spoke 上各有独立 Reserve |
+
+---
+
 ### 5.6 Supply Rate vs Utilization Rate
 
 注意区分两个概念：
