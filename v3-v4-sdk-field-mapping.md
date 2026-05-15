@@ -512,7 +512,54 @@ for (const chainIdValue of chainIds) {
 
 ---
 
+## V4 Simulation Hub 聚合修正
+
+### 问题
+
+V4 的 `interestRateCalculator.ts` 中 `borrowUsageDenominator = liquidity + borrowed`，
+`liquidity` 是 Hub 级，`borrowed` 是 Reserve 级（per-Spoke），跨层加法不正确。
+
+### 解决方案
+
+在 `useSharedRateSimulations` 中按 `hubId:tokenAddress` 聚合同 Hub 下所有 Spoke 的
+`borrowed`/`supplied`，构造 Hub 级 `RateCalcInput` 传入利率计算。
+
+### 数据流
+
+```
+reserves[] → buildHubAggregationMap() → Map<hubId:tokenAddress, HubAggregate>
+                                          ↓
+reserveRateInput = { ...reserve, borrowed: hubAgg.hubBorrowed }
+                                          ↓
+simulateNativeRatesAfterActions(reserveRateInput, actions)
+```
+
+### 聚合 Key
+
+`HubAssetKey = ${hubId}:${tokenAddress}`
+
+- `hubId = base64(chainId::hubAddress)`，已含 chainId，链级别唯一
+- 同 Hub 同 token 的各 Spoke 的 `borrowed`/`supplied` 聚合
+- 不同 token 的 HubAsset 独立（不同 utilization/liquidity/利率模型）
+
+### V3 不受影响
+
+`if (!r.hubId) continue` 跳过 V3 reserve，V3 路径完全不变。
+
+### 数据完整性校验
+
+`validateHubAggregateConsistency()` 在 dev 模式下对比聚合算出的 utilization
+与 API 返回的 `utilizationPct`，偏差 > 5% 时 console.warn。
+
+### 关键隔离：capping 用 Spoke 级数据
+
+`reserveRateInput.borrowed` 替换为 Hub 聚合值后，`buildRateSimulationResult` 的
+capping 层从原始 `reserve.borrowed`（per-Spoke）读取 `currentTotalBorrowedUsd`，
+避免 Hub 总借款远大于 Spoke cap 导致 borrow 永远被截断为 0。
+
+---
+
 **文档创建日期**: 2026-04-27  
-**最近更新**: 2026-05-02（同步 V3/V4 精度统一后的代码现状：删除 `fetchHubAssetIndex` / `hubAssets` / `percentOnChainValueToRay`；rate 参数改 percent number；hub 级字段直接走 `r.asset.summary/settings`）  
-**依据代码**: `src/index.ts`, `src/v4-fetcher.ts`  
+**最近更新**: 2026-05-15（V4 Simulation Hub 聚合修正：按 hubId:tokenAddress 聚合 Spoke 的 borrowed/supplied，替换 per-Spoke 值传入利率计算；capping 层保持 per-Spoke borrowed 不变）  
+**依据代码**: `src/index.ts`, `src/v4-fetcher.ts`, `src/lib/hubAggregation.ts`, `src/hooks/useRateSimulation.ts`  
 **相关文档**: `v3-v4-precision-unification-plan.md`, `field-glossary.md`
