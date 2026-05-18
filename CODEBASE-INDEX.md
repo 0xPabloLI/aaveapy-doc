@@ -31,10 +31,13 @@ aaveapy/
 ### 后端 `aave-protocol-analysis/`
 ```
 aave-protocol-analysis/
-├── src/           # 数据抓取 (v4-fetcher, merkl-api, merit-api, brevis-api)
+├── packages/
+│   ├── aave-shared-contracts/  # 类型定义、字段注册表、验证
+│   ├── aave-fetcher/           # fetchMarketsData + SDK 客户端 + 激励适配器
+│   └── aave-shared-config/     # 静态配置常量
+├── src/           # 纯 re-export 层 (从 @internal/* 引用)
 ├── backend/       # API Server
 │   └── src/       # controllers/, routes/, services/, middleware/
-├── packages/      # aave-shared-config
 ├── workers/       # Cloudflare Workers
 ├── aaveapy-doc/   # 协议文档 (symlink → code/aaveapy-doc/)
 └── data/          # 抓取数据
