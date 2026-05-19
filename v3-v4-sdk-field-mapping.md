@@ -295,8 +295,8 @@ export function isSupplyDisabledV3(
 
 | 版本 | 格式 |
 |------|------|
-| V3 | `${marketName}:${chainId}:${tokenAddress}` |
-| V4 | `${marketName}:${chainId}:${tokenAddress}:${hubName}` |
+| V3 | `${chainId}:${poolAddress}:${tokenAddress}` |
+| V4 | `${chainId}:${spokeAddress}:${tokenAddress}:${hubName}` |
 
 **评估**: 不建议抽象，因为：
 - 格式差异是根本性的（V4 需要 hubName 区分多 hub）
