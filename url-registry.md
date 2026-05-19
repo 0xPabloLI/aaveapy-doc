@@ -158,3 +158,81 @@ Implemented in `aaveapy/` (sibling frontend repo).
 | Railway GraphQL API | `${RAILWAY_API_URL}` | `.github/workflows/deployment-smoke-test.yml` |
 | R2 Backup Endpoint | `${R2_ENDPOINT}` (e.g. `https://<account-id>.r2.cloudflarestorage.com`) | `.github/workflows/db-backup.yml` |
 | Cloudflare Worker | `${CLOUDFLARE_WORKER_URL}` | `docs/deploy/cloudflare-complete-guide.md` |
+| Vercel Deployments API | `https://api.vercel.com/v6/deployments` | `.github/workflows/deployment-smoke-test.yml` |
+| Vercel Rollback API | `https://api.vercel.com/v1/projects/{id}/rollback/{id}` | `.github/workflows/deployment-smoke-test.yml` |
+| Cloudflare API v4 | `https://api.cloudflare.com/client/v4` | `scripts/sync-cloudflare-gh-actions-allowlist.mjs` |
+| GitHub API Meta | `https://api.github.com/meta` | `scripts/sync-cloudflare-gh-actions-allowlist.mjs` |
+
+## 10. Block Explorer URLs
+
+| Chain | Explorer Base URL | Source |
+|---|---|---|
+| Ethereum | `https://etherscan.io` | `src/lib/poolExplorerLinks.ts` |
+| Arbitrum | `https://arbiscan.io` | `src/lib/poolExplorerLinks.ts` |
+| Optimism | `https://optimistic.etherscan.io` | `src/lib/poolExplorerLinks.ts` |
+| Polygon | `https://polygonscan.com` | `src/lib/poolExplorerLinks.ts` |
+| Base | `https://basescan.org` | `src/lib/poolExplorerLinks.ts` |
+| Gnosis | `https://gnosisscan.io` | `src/lib/poolExplorerLinks.ts` |
+| BNB | `https://bscscan.com` | `src/lib/poolExplorerLinks.ts` |
+| Avalanche | `https://snowscan.xyz` | `src/lib/poolExplorerLinks.ts` |
+| Linea | `https://lineascan.build` | `src/lib/poolExplorerLinks.ts` |
+| Scroll | `https://scrollscan.com` | `src/lib/poolExplorerLinks.ts` |
+| zkSync | `https://zksync.blockscout.com` | `src/lib/poolExplorerLinks.ts` |
+| zkSync (alt) | `https://explorer.zksync.io` | `src/lib/multiExplorerSupport.ts` |
+| Metis | `https://metisscan.info` | `src/lib/poolExplorerLinks.ts` |
+| Sonic | `https://sonicscan.org` | `src/lib/poolExplorerLinks.ts` |
+| Celo | `https://celoscan.io` | `src/lib/poolExplorerLinks.ts` |
+| MegaEth | `https://mega.etherscan.io` | `src/lib/poolExplorerLinks.ts` |
+| Plasma | `https://plasmascan.to` | `src/lib/poolExplorerLinks.ts` |
+| Mantle | `https://mantlescan.xyz` | `src/lib/poolExplorerLinks.ts` |
+| Soneium | `https://soneium.blockscout.com` | `src/lib/poolExplorerLinks.ts` |
+| Ink | `https://explorer.inkonchain.com` | `src/lib/poolExplorerLinks.ts` |
+| X Layer | `https://www.oklink.com` | `src/lib/poolExplorerLinks.ts` |
+
+## 11. Upstream Sync URLs (Raw GitHub)
+
+| Resource | URL Pattern | Source |
+|---|---|---|
+| Aave Interface networksConfig | `https://raw.githubusercontent.com/aave/interface/main/src/ui-config/networksConfig.ts` | `scripts/sync-chain-icon-map-upstream.mjs` |
+| Aave Interface marketsConfig | `https://raw.githubusercontent.com/aave/interface/main/src/ui-config/marketsConfig.tsx` | `scripts/sync-market-name-map-upstream.mjs` |
+| Aave Interface reservePatches | `https://raw.githubusercontent.com/aave/interface/main/src/ui-config/reservePatches.ts` | `scripts/sync-reserve-patches-upstream.mjs` |
+| Aave Interface public dir | `https://raw.githubusercontent.com/aave/interface/main/public` | `scripts/sync-chain-network-icons-upstream.mjs` |
+| Aave Interface token icons | `https://raw.githubusercontent.com/aave/interface/main/public/icons/tokens` | `scripts/sync-token-icons.mjs` |
+| Aave Address Book | `https://raw.githubusercontent.com/aave-dao/aave-address-book/main/src` | `scripts/sync-pool-addresses-upstream.mjs` |
+
+## 12. Frontend CDN Dependencies
+
+| Resource | URL | Source |
+|---|---|---|
+| Google Fonts API (preconnect) | `https://fonts.googleapis.com` | `index.html` |
+| Google Fonts Static (preconnect) | `https://fonts.gstatic.com` | `index.html` |
+| Source Sans Pro | `https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@...` | `index.html` |
+| Source Code Pro | `https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@...` | `index.html` |
+| Swagger UI CSS | `https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css` | `public/swagger.html` |
+| Swagger UI JS | `https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js` | `public/swagger.html` |
+| shadcn/ui Schema | `https://ui.shadcn.com/schema.json` | `components.json` |
+
+## 13. Social / Community Links
+
+| Platform | URL | Source |
+|---|---|---|
+| Twitter (author) | `https://twitter.com/silenlee` | `src/pages/Index.tsx` |
+| Twitter (project) | `https://twitter.com/AAVE_APY` | `index.html` (structured data) |
+| Telegram | `https://t.me/aaveapy` | `src/pages/Index.tsx` |
+| GitHub (repo) | `https://github.com/0xPabloLI/aaveapy` | `src/pages/Index.tsx` |
+| Ink announcement | `https://x.com/inkfndhq/status/1934991370957033888` | `src/components/dashboard/InkAprCalculator.tsx` |
+
+## 14. External Frontend Links
+
+| Service | URL Pattern | Source |
+|---|---|---|
+| CoinMarketCap Currencies | `https://coinmarketcap.com/currencies/{slug}` | `src/components/dashboard/InkAprCalculator.tsx` |
+| CoinGecko Search API | `https://api.coingecko.com/api/v3/search` | `src/hooks/useCoingeckoTokenImage.ts` |
+| Tydro App | `https://app.tydro.com` | `src/lib/tydroLinks.ts` |
+
+## 15. Test / Dev URLs (non-production)
+
+| Resource | URL | Source |
+|---|---|---|
+| Playwright base URL | `http://127.0.0.1:4173` | `playwright.config.ts` |
+| Vite dev server (default) | `http://localhost:5173` | CORS allowlist, `public/expand-icon-preview.html` |
