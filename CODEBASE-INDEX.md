@@ -147,3 +147,5 @@ cd aaveapy-doc && ./clone-all.sh ~/code
 | `aave-protocol-analysis/docs/changes/pro-aave-v4-deeplinks.md` | V4 Deeplink 生成 | 后端项目专属 |
 | `aave-v4/docs/overview.md` | V4 协议架构总览 | 合约项目专属 |
 | `aave-v3-origin/docs/terminology-and-formulas.md` | V3 术语与公式 | 合约项目专属 |
+| `aaveapy/CONTEXT.md` | 前端领域术语正名 (opinionated glossary) | 前端项目专属，→ 知识参考 `field-glossary.md` + `v3-v4-sdk-field-mapping.md` |
+| `aave-protocol-analysis/CONTEXT.md` | 后端领域术语正名 (opinionated glossary) | 后端项目专属，→ 知识参考 `field-glossary.md` + `v3-v4-sdk-field-mapping.md` |
