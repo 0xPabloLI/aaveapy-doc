@@ -1,4 +1,4 @@
-# Aave V4 ID 命名空间与层级关系
+# Aave V4 ID 命名空间、层级关系与仓位隔离
 
 ---
 
@@ -280,3 +280,121 @@ graph TD
 | ³~⁶ | 各 Spoke 中 WETH 的 reserveId，各自独立从 0 开始，巧合时相同但**无全局唯一性** |
 
 **结论**：assetId 和 reserveId 都是**局部 ID**，只在所属合约（Hub / Spoke）内有意义。跨合约引用时必须携带所属合约地址（hub address / spoke address）。
+
+---
+
+## 九、仓位隔离：Spoke 是边界，Hub 不是
+
+### 9.1 核心结论
+
+| 场景 | 能否用 A 的 collateral 借 B？ | 原因 |
+|------|:----------------------------:|------|
+| SpokeA supply → SpokeB borrow（不同 Spoke） | **不能** | 仓位按 Spoke 隔离，SpokeB 看不到 SpokeA 的 collateral |
+| Spoke 内 hub1 supply → Spoke 内 hub2 borrow（同 Spoke 不同 Hub） | **能** | 同一 Spoke 内所有 reserveId 的 collateral 统一计算 HF，不区分 Hub |
+| Spoke 内 hub1 assetId=A supply → Spoke 内 hub1 assetId=B borrow（同 Spoke 同 Hub） | **能** | 最基本场景，同上 |
+
+**一句话：Spoke 是用户仓位的隔离边界，Hub 不是。**
+
+### 9.2 架构角色
+
+```mermaid
+graph LR
+    User -->|"supply / borrow"| Spoke
+    Spoke -->|"add / draw / remove / restore"| Hub
+
+    subgraph SpokeLayer["Spoke 层（用户账户聚合）"]
+        SpokePos["_userPositions[user][reserveId]<br/>_positionStatus[user]<br/>→ HF 计算、collateral/borrow 追踪"]
+    end
+
+    subgraph HubLayer["Hub 层（流动性池）"]
+        HubAsset["_assets[assetId]<br/>_spokes[assetId][spoke]<br/>→ 利率、流动性、cap 控制"]
+    end
+
+    style SpokeLayer fill:#e6f3ff,stroke:#336699
+    style HubLayer fill:#fff3e6,stroke:#996633
+```
+
+| 层 | 职责 | 仓位数据 | 流动性数据 |
+|----|------|---------|-----------|
+| **Spoke** | 用户交互面、账户管理、HF 验证 | `_userPositions[user][reserveId]`、`_positionStatus[user]` | — |
+| **Hub** | 流动性协调、利率计算、cap 控制 | — | `_assets[assetId]`、`_spokes[assetId][spoke]` |
+
+### 9.3 跨 Spoke 隔离机制
+
+**存储隔离**：每个 Spoke 合约有独立的 contract storage。同一用户地址在 SpokeA 和 SpokeB 中有各自独立的 `_userPositions` 和 `_positionStatus`。
+
+```solidity
+// SpokeStorage.sol:28-33
+mapping(address user => mapping(uint256 reserveId => ISpoke.UserPosition))
+    internal _userPositions;     // 仓位数据：per Spoke
+
+mapping(address user => ISpoke.PositionStatus)
+    internal _positionStatus;    // collateral/borrowing bitmap：per Spoke
+```
+
+**HF 只看当前 Spoke**：`_processUserAccountData`（`Spoke.sol:706-813`）遍历 `_positionStatus[user]` 中所有 reserveId，不跨 Spoke、不跨 Hub：
+
+```solidity
+PositionStatus storage positionStatus = _positionStatus[user];
+while (true) {
+    (reserveId, borrowing, collateral) = positionStatus.next(reserveId);
+    if (reserveId == PositionStatusMap.NOT_FOUND) break;
+    // 累加 collateral 和 debt，不区分 Hub
+}
+// healthFactor = avgCollateralFactor * RAY / totalDebtValueRay
+```
+
+**Hub 不维护用户仓位**：Hub 只存全局资产级会计（总 suppliedShares、总 drawnShares、利率等），不存在跨 Spoke 的仓位查询机制（`HubStorage.sol:16-22`）。
+
+**测试佐证**：`Spoke.Borrow.Scenario.t.sol:393` 的多 Spoke 测试中，用户在 spoke1 和 spoke2 **各自** supply collateral 后才能 **各自** borrow——不存在"SpokeA supply collateral、仅 SpokeB borrow"的场景。
+
+### 9.4 同 Spoke 跨 Hub 抵押机制
+
+**PositionStatus bitmap 不区分 Hub**：`_positionStatus[user]` 按 reserveId 编号，同一 Spoke 内所有 reserveId（无论关联哪个 Hub）共享同一个 bitmap。每个 reserveId 占 2 bit（bit 0 = borrowing，bit 1 = collateral），`next()` 扫描所有活跃位，循环内无 Hub 过滤（`PositionStatusMap.sol:22-51`）。
+
+**同一 underlying token 在不同 Hub 有不同 reserveId**（见第一节去重约束）：同一 Spoke 中 hub1 的 DAI → reserveId=0，hub2 的 DAI → reserveId=1，两者在 bitmap 中各自独立占位，但 HF 计算统一累加。
+
+**HF 计算统一累加**：`_processUserAccountData` 对所有 reserveId 的 collateral value 统一累加到 `totalCollateralValue`，所有 debt 统一累加到 `totalDebtValueRay`，**不按 Hub 分组**。hub1 的 collateral 可以覆盖 hub2 的 debt。
+
+**测试佐证**：
+
+| 测试 | 文件 | 场景 |
+|------|------|------|
+| `test_borrow_secondHub` | `Spoke.MultipleHub.t.sol:90` | Bob 只在 hub1 supply collateral，直接在 hub2 borrow DAI |
+| `test_borrow_thirdHub` | `Spoke.MultipleHub.t.sol:175` | hub3 的 collateral 覆盖 hub1 的 debt，Bob 从 hub1 withdraw 全部 DAI |
+| IsolationMode | `Spoke.MultipleHub.IsolationMode.t.sol:149` | newHub 上的 assetA collateral borrow canonical hub1 上的 assetB |
+| SiloedBorrowing | `Spoke.MultipleHub.SiloedBorrowing.t.sol:149` | canonical hub1 的 assetA collateral borrow newHub 上的 assetB |
+
+### 9.5 跨 Hub 的 cap 控制机制
+
+跨 Hub borrow 不是无条件允许，Hub 侧通过 **addCap / drawCap** 精细控制：
+
+| 参数 | 控制对象 | 设为 0 的效果 |
+|------|---------|-------------|
+| `addCap` | 该 Spoke 向该 Hub asset 的 supply 上限 | 禁止该 Spoke 向该 Hub supply（但可 borrow） |
+| `drawCap` | 该 Spoke 从该 Hub asset 的 borrow 上限 | 禁止该 Spoke 从该 Hub borrow（但可 supply） |
+
+典型模式：
+
+| 模式 | addCap | drawCap | 含义 |
+|------|--------|---------|------|
+| **IsolationMode** | 0 | >0 | 只允许 borrow，不允许 supply（新 Spoke 从 canonical Hub 借流动性但不向其供应） |
+| **SiloedBorrowing** | >0 | 0 | 只允许 supply，不允许 borrow（新 Spoke 向 canonical Hub 供应流动性但不在其上借款） |
+| **双向开放** | >0 | >0 | supply 和 borrow 均允许 |
+
+> 源码：`src/hub/Hub.sol:814-858`（`_validateAdd` / `_validateDraw`）
+
+### 9.6 PositionManager 的角色
+
+PositionManager 是可选的辅助合约，可注册多个 Spoke（`_registeredSpokes` 映射），通过 multicall 在多个 Spoke 上代为执行操作。但它**不改变仓位隔离**——只是"代理执行"，不会合并不同 Spoke 的 collateral 视图（`PositionManagerBase.sol:19-20`）。
+
+### 9.7 形式化验证现状
+
+当前代码库**没有**对仓位隔离属性的形式化证明（无 Certora spec、Halmos 测试等）。
+
+| 类型 | 文件 | 验证内容 |
+|------|------|---------|
+| TypeScript 原型不变量 | `tests/misc/prototype/core.ts` | Hub/Spoke/User 会计一致性（drawnDebt、premiumDebt、suppliedShares 求和一致），**不涉及仓位隔离** |
+| Solidity CheckedActions | `tests/helpers/spoke/CheckedActions.sol` | 单操作单调性（supply 后 shares 增加、borrow 后 debt 增加），**不涉及跨 Spoke 隔离** |
+
+仓位隔离是**构造性保证**：Solidity 合约存储隔离 + `_processUserAccountData` 只遍历当前合约的 `_positionStatus`，使得跨 Spoke 访问在语言语义上不可能。若要形式化验证，需证明"不存在任何执行路径能使 SpokeB 的 HF 计算读到 SpokeA 的 `_userPositions`"——目前未做。

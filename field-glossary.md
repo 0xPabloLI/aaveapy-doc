@@ -57,8 +57,29 @@
 | `supplyIncentives` | **Protocol Incentive** | Aave 协议供应激励，累加后合入总 Supply APY |
 | `borrowIncentives` | **Protocol Incentive** | Aave 协议借贷激励，累加后从总 Borrow APY 扣除 |
 | `meritSupplys` / `meritBorrows` | **ACI Incentive** | Merit 激励，同协议激励处理 |
-| `merklSupplys` / `merklBorrows` / `merklHolds` | **Merkl Incentive** | Merkl 激励，同协议激励处理；有白名单切换开关 |
+| `merklSupplys` / `merklBorrows` / `merklHolds` | **Merkl Incentive** | Merkl 激励，同协议激励处理；有白名单切换开关；**含 `netPositionConstraint` 子字段**（见下） |
 | `brevisSupplys` / `brevisBorrows` | **Brevis Incentive** | Brevis 激励，同协议激励处理 |
+
+#### `netPositionConstraint`（Merkl opportunity 子字段）
+
+**位置**：`merklSupplys[i].netPositionConstraint` / `merklBorrows[i].netPositionConstraint`（opportunity 级别，不在 reserve 顶层）
+
+```typescript
+netPositionConstraint?: {
+  sourceSide: "supply" | "borrow";      // 净仓位的 source 方向
+  offsetReserveIds: string[];            // 需从 source 仓位扣除的 reserve ID 列表
+} | null;
+```
+
+**含义**：`opportunityType` 为 `AAVE_NET_LENDING` / `AAVE_NET_BORROWING` 时存在，表示 APR 仅对**净仓位**（source - Σoffset）生效。
+
+**Portfolio simulation 修正**：
+- 无此字段 → 用全额仓位 × APR（普通 incentive）
+- 有此字段 → 用净仓位 × APR：`netPos = sourceSide === "supply" ? (supply - Σoffset.borrow) : (borrow - Σoffset.supply)`，clamp ≥ 0
+
+**offset reserve 范围**：限定在与 source reserve **同一 pool/spoke** 内（V3: 同 poolAddress; V4: 同 hubAddress，可能跨 spoke）。
+
+⚠️ **当前前端风险**：如忽略此字段，收益会被严重高估（2-5 倍）。详见 `net-position-constraint-frontend-guide.md`。
 
 激励整合（前端 `formatters.ts`）—— API 返回数组字段，前端求和后参与计算：
 - **Total Supply APY** = `supplyApy + sum(supplyIncentives) + sum(meritSupplys) + sum(merklSupplys) + sum(brevisSupplys)`（均经 APR→APY 转换）

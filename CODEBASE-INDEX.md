@@ -115,6 +115,7 @@ aave-v4/
 | `field-glossary.md` | 知识 | API 字段 → 前端展示概念对照表 |
 | `v3-v4-sdk-field-mapping.md` | 知识 | V3/V4 SDK 字段来源 → API 输出映射 |
 | `v3-v4-incentive-matching.md` | 知识 | V3/V4 激励匹配问题分析 |
+| `hub-spoke-position-isolation.md` | 知识 | V4 仓位隔离：跨 Spoke 隔离 + 同 Spoke 跨 Hub 抵押机制（storage 隔离、HF 计算范围、addCap/drawCap 控制、形式化验证现状） |
 
 ## 本地开发环境
 
