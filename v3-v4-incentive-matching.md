@@ -1,7 +1,7 @@
 # V3/V4 Incentive 匹配问题分析
 
-**文档版本**: 2026-05-23  
-**状态**: Merkl 已解决（protocolVersion 推导已实现），Merit/Brevis 暂时仅 V3
+**文档版本**: 2026-05-29  
+**状态**: Merkl 已解决（protocolVersion 推导 + campaign type 三级映射已实现），Merit/Brevis 暂时仅 V3
 
 ---
 
@@ -63,6 +63,20 @@
 
 `findMatchingMerklOpportunities()` 接收 `protocolVersion` 参数，只返回匹配版本的 opportunities。调用方根据 reserve 的 `marketName` 前缀（`AaveV4`→`v4`）决定传入哪个版本。
 
+#### Merkl Campaign Type 三级优先级映射 (ADR-0024, 2026-05-29)
+
+Merkl 新增 `AAVE_NET_APR`、`AAVE_V4_NET_APR`、`ERC4626_APR` 三种 distributionType 后，原有单字段匹配逻辑无法识别，导致 campaign 被跳过、数据丢失。
+
+**解决**：`normalizeCampaignType` 从 `(distributionType: string)` 改为接收 `{distributionType?, distributionMethod?, mode?}` 对象，按 `distributionMethod → distributionType → mode` 三级优先级映射到 `CampaignForecastType`。
+
+| 优先级 | 字段 | 映射 |
+|--------|------|------|
+| L1 | `distributionMethod` | `MAX_APR`→MAX, `FIX_APR`→FIX, `DUTCH_AUCTION`→DUTCH |
+| L2 | `distributionType` | 3 种已知 type 直映射 |
+| L3 | `mode` | `MAX_APR`→MAX |
+
+**效果**：未来 Merkl 新增 distributionType 时，只要 distributionMethod 或 mode 能映射到已知类型，无需改代码。
+
 #### Merkl API 返回的可用字段总结
 
 | 字段 | V3/V4 区分能力 | 可靠性 |
@@ -96,7 +110,7 @@
 | Merkl | ✅ 有 (4 条 V4, 113 条 V3) | type 前缀 `AAVE_V4_` + explorerAddress 结构验证 |
 | Brevis | ❌ 无 (仅 v3) | `protocolVersion` 写死为 `'v3'`，且活动目前仅限 Linear |
 
-**结论：Merkl 的 V3/V4 匹配已通过 protocolVersion 推导解决（ADR-0018）。Merit/Brevis 目前无 V4 数据，预留了 `protocolVersion` 字段供未来使用。**
+**结论：Merkl 的 V3/V4 匹配已通过 protocolVersion 推导解决（ADR-0018）。Merkl campaign type 识别已通过三级优先级映射解决（ADR-0024）。Merit/Brevis 目前无 V4 数据，预留了 `protocolVersion` 字段供未来使用。**
 
 ### Merkl V4 数据明细（2026-05-23）
 
@@ -114,6 +128,7 @@
 | 风险等级 | 源 | 场景 | 影响 | 状态 |
 |----------|---|------|------|------|
 | 🟢 已解决 | Merkl | V4 campaign 错配到 V3 reserve | 重复 incentive | ✅ protocolVersion 推导 |
+| 🟢 已解决 | Merkl | 新 distributionType 无法识别 | campaign 丢失 | ✅ 三级优先级映射 (ADR-0024) |
 | 🟡 中 | Merit | V4 campaign 使用相同 key 格式 | V4 incentive 被错配到 V3 market | ⏳ 预留 protocolVersion |
 | 🟡 中 | Brevis | 同链同 token 在 V3+V4 都有 campaign | 两个 reserve 获得相同 incentive | ⏳ 预留 protocolVersion |
 
@@ -188,6 +203,9 @@ V4 返回多个 reserveId 的原因：同一 asset 在不同 spoke 上有不同 
 | Merit 匹配 | `packages/aave-fetcher/src/merit-api.ts` | `getMeritDataFromMarket()` |
 | Merkl 匹配 | `packages/aave-fetcher/src/merkl-api.ts` | `findMatchingMerklOpportunities()` |
 | Merkl protocolVersion 推导 | `packages/aave-fetcher/src/merkl-api.ts` | `deriveProtocolVersion()`, `buildProtocolVersionLookup()` |
+| Merkl campaign type 归一化 (fetcher) | `packages/aave-fetcher/src/merkl-api.ts` | `normalizeForecastCampaignTypeLite()`, `buildForecastCampaignMetaLiteMap()` |
+| Merkl campaign type 归一化 (backend) | `backend/src/services/merklForecastModel.ts` | `normalizeCampaignType()` |
+| Merkl forecast 调用点 | `backend/src/services/merklForecastService.ts` | `getFreshCampaignMetaMapFromLiteFile()`, `buildCampaignOpportunityMetaMapFromOpportunities()` |
 | Brevis 索引构建 | `packages/aave-fetcher/src/brevis-api.ts` | `fetchBrevisAprs()` 内部 |
 | V4 数据获取 | `packages/aave-fetcher/src/v4-fetcher.ts` | `fetchAaveV4Reserves()` |
 | 统一数据集 | `packages/aave-fetcher/src/index.ts` | `buildMarketsBaseDataset()` |
@@ -195,6 +213,7 @@ V4 返回多个 reserveId 的原因：同一 asset 在不同 spoke 上有不同 
 ## 7. 相关文档
 
 - ADR-0018 Merkl protocolVersion 推导: `docs/adr/0018-merkl-campaigngroup-protocol-version.md`
+- ADR-0024 Merkl campaign type 三级优先级映射: `docs/adr/0024-merkl-campaign-type-multi-level-mapping.md`
 - CONTEXT.md glossary (CampaignGroup, protocolVersion): `CONTEXT.md`
 - API 总览：`docs/api/api-documentation.md`
 - Brevis 补充：`docs/api/brevis-supplement.md`
