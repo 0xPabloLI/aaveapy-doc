@@ -47,6 +47,7 @@
 | `variableRateSlope2` | 传入 `useRateSimulation` 参与利率模拟 | 利率曲线斜率 2（percent） |
 | `optimalUsageRate` | Utilization 列 "Optimal" 标记、UtilizationSheet | 最优利用率（percent），前端展示百分比 |
 | `baseVariableBorrowRate` | 传入 `useRateSimulation` 参与利率模拟 | 基础可变借款利率（percent） |
+| `collateralRisk` | V4 Risk Premium Simulation：按用户抵押品组合加权计算 RP，调整 Effective Borrow APY | V4 Reserve 抵押风险参数（percent），V3 不返回此字段（undefined） |
 
 ---
 
@@ -54,13 +55,15 @@
 
 | API 字段 | 前端展示名称 | 说明 |
 |----------|------------|------|
-| `supplyIncentives` | **Protocol Incentive** | Aave 协议供应激励，累加后合入总 Supply APY |
-| `borrowIncentives` | **Protocol Incentive** | Aave 协议借贷激励，累加后从总 Borrow APY 扣除 |
+| `supplyIncentives` | ~~**Protocol Incentive**~~ | ⚠️ 已弃用，不序列化到 API。V3 遗留激励格式，已被 merit/merkl/brevis 替代 |
+| `borrowIncentives` | ~~**Protocol Incentive**~~ | ⚠️ 已弃用，不序列化到 API。V3 遗留激励格式，已被 merit/merkl/brevis 替代 |
 | `meritSupplys` / `meritBorrows` | **ACI Incentive** | Merit 激励，同协议激励处理 |
 | `merklSupplys` / `merklBorrows` / `merklHolds` | **Merkl Incentive** | Merkl 激励，同协议激励处理；有白名单切换开关；**含 `netPositionConstraint` 子字段**（见下） |
 | `brevisSupplys` / `brevisBorrows` | **Brevis Incentive** | Brevis 激励，同协议激励处理 |
 
 #### `netPositionConstraint`（Merkl opportunity 子字段）
+
+> **架构参考**: [ADR-0023: 三层检测架构](../docs/adr/0023-net-position-constraint-detection.md)
 
 **位置**：`merklSupplys[i].netPositionConstraint` / `merklBorrows[i].netPositionConstraint`（opportunity 级别，不在 reserve 顶层）
 
