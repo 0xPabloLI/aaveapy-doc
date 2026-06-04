@@ -185,13 +185,18 @@ V4 返回多个 reserveId 的原因：同一 asset 在不同 spoke 上有不同 
 
 ### 5.2 后续待做
 
-1. **Brevis 索引改进**（当 Brevis 出现 V4 campaign 时）
-   - 可复用 Merkl 中的反查表模式：构建 `chainId:protocolId → version` 映射
-   - 当前 `protocolVersion` 字段已预留，只需更新推导逻辑
+1. **V4 激励监控日志**（可立即实施）
+   - `enrichDatasetWithIncentiveData()` 中：V4 reserve 获得 Brevis/Merit incentive 时输出 `warn` 日志
+   - `findMatchingMerklOpportunities()` 中：有 opportunity 被版本过滤掉时输出 `info` 日志
+   - 目的：第一时间发现 V4 激励数据上线，以及确认 Merkl 版本过滤是否生效
 
-2. **Merit 观察**
-   - 等 V4 campaign 出现后，分析 key 格式是否有变化
-   - 如有版本标识，更新 `getMeritDataFromMarket()` 的 chainKey 映射；否则需找其他区分手段
+2. **Brevis 索引改进**（当 Brevis 出现 V4 campaign 时）
+   - 采用与 Merkl 相同模式：同 key 存数组 + protocolVersion 过滤
+   - 不改上游索引键格式，保持与 Brevis 团队现有接口兼容
+
+3. **Merit 匹配改进**（当 Merit 出现 V4 campaign 时）
+   - 同 key 存数组 + protocolVersion 过滤
+   - Merit 使用 symbol 匹配，V3/V4 同链同 symbol 一定冲突，必须加版本过滤
 
 ---
 
