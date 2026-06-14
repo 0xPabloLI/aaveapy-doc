@@ -94,9 +94,9 @@ Brevis gRPC 的 `config.end` 必有值，`endTimestamp` 从可选改为必选。
 
 `campaignId` 从可选改为必选，与 Merkl 一致。
 
-### 10. 移除 `budgetNormalizedAmount` / `budgetTokenSymbol`
+### 10. 移除 `budgetNormalizedAmount` / `budgetTokenSymbol`（对前端透明）
 
-从 `BrevisCampaignBreakdown` / `ApiBrevisBreakdown` 类型中移除。这两个字段是 `totalBudget` 计算的中间产物，enrich 后被 prune 剥离，不出现在 API 响应中。
+这两个字段从未出现在 API 响应中（enrich 中间产物，prune 后剥离），类型层面移除对前端无影响。
 
 ### AAV-865 完成后的统一字段表
 
@@ -125,31 +125,3 @@ Brevis gRPC 的 `config.end` 必有值，`endTimestamp` 从可选改为必选。
 | requiredDaily | ✅ 可选 | ❌ | Merkl MAX 有，FIX/Brevis 无 |
 | distributedSoFar | ✅ | ✅ | |
 | endTimestamp | ✅ 必选 | ✅ 必选 | AAV-865 统一 |
-
----
-
-## Spin-off Issues 状态
-
-### AAV-866: forecast endTimestamp 是否与 breakdown campaignEndedAt 冗余 — Done
-
-**结论：不冗余，保留。**
-
-- Merkl: breakdown `campaignEndedAt`（ISO）来自 opportunities API，forecast `endTimestamp`（Unix）来自 campaign details API。同一字段但不同 endpoint，理论上可能有缓存不一致。
-- Brevis: 两者同源（gRPC `config.end`），值完全一致，但格式不同（ISO vs Unix）。
-- 前端消费模式不同：forecast `endTimestamp` 用于预算消耗天数计算，breakdown `campaignEndedAt` 用于展示。两者独立消费。
-
-### AAV-867: Brevis 其他 distribution type（非 FIX）— Done
-
-**结论：Brevis 只有 FIX。**
-
-- gRPC `campaign.type` 是 action type（2001=borrow, 2002=supply, 3001=both），不是 distribution type。
-- Brevis 没有 Dutch auction 或 MAX reward 机制。代码中已加注释说明默认值原因和未来更新条件。
-
-### AAV-864: 单 cron + 缓存 TTL 重构 — Todo（需前端确认）
-
-**后端侧评估完成，需前端确认消费场景后才能推进。**
-
-- 核心决策点：`plannedDaily`/`totalBudget`/`aprCap` 前端是否只在 forecast 上下文消费
-- 如果只在 forecast 上下文用 → 迁移到 forecast 合理
-- 如果需要和 markets snapshot 同层消费 → 迁移增加 join 复杂度，不适合
-- 后端已完成技术前提：Brevis 链上缓存（1h TTL）、Merkl metrics 动态 TTL（10m~6h）
