@@ -54,7 +54,24 @@ TARGET_TOTAL_APR campaign 的 breakdown 已出现在 `/api/markets` 响应中：
 | **TARGET_TOTAL_APR** | **总 APR 目标 (targetAPR)** | `distributionSettings.targetAPR` |
 | DUTCH_AUCTION | 无 APR cap | N/A |
 
-**关键区别**：TARGET_TOTAL_APR 的 `aprCap` 是"用户应得的总 APR"，不是"Merkl 支付的部分"。前端需自行减去 nativeAPR 得到 Merkl 实付部分。
+**关键区别**：TARGET_TOTAL_APR 的 `aprCap` 是"用户应得的总 APR"，不是"Merkl 支付的部分"。但后端已自动将 `campaignApr` 转换为 Merkl 实付 APR，前端无需手动计算。
+
+### 1.3.1 campaignApr 语义（2026-06-15 更新）
+
+| campaignType | campaignApr 含义 | 前端使用方式 |
+|---|---|---|
+| MAX / FIX / DUTCH | Merkl 实付 APR | 直接使用 |
+| **TARGET_TOTAL_APR** | **Merkl 实付 APR**（后端已计算） | **直接使用，无需手动减 nativeAPY** |
+
+后端在序列化时已将 TARGET_TOTAL_APR 的 `campaignApr` 从 `targetAPR` 转换为实付 APR：
+
+```
+targetAPY = convertAprToApy(targetAPR)     // APR→APY (月复利 n=12)
+incentiveAPY = targetAPY - nativeAPY       // supply; borrow 侧 = nativeAPY - targetAPY
+campaignApr = apyToApr(max(incentiveAPY, 0)) // APY→APR，输出与 MAX/FIX 统一格式
+```
+
+转换公式与前端 `rateCalculations.ts` 完全一致（月复利 n=12）。`aprCap` 字段仍保留原始 `targetAPR`，供前端展示"目标 APR"。
 
 ### 1.4 budgetBoundMode 链路状态（已接通）
 
@@ -107,17 +124,11 @@ TARGET_TOTAL_APR campaign 的 breakdown 已出现在 `/api/markets` 响应中：
 
 ### 2.1 新增 TARGET_TOTAL_APR 到前端 campaign type 联合类型
 
-### 2.2 APR 计算
+### 2.2 APR 计算（2026-06-15 更新：后端已完成，前端无需计算）
 
-**Aave lending 场景下，公式只有一种**：
+**后端已将 `campaignApr` 转换为 Merkl 实付 APR**，前端对 TARGET_TOTAL_APR 的 `campaignApr` 可与 MAX/FIX 完全相同的方式使用，**无需手动减 nativeAPY**。
 
-```
-merklActualAPR = max(aprCap - nativeAPR, 0)
-```
-
-- `aprCap` = API 返回的 `aprCap` 字段（= targetAPR，总 APR 目标）
-- `nativeAPR` = reserve 自身的 supplyApy / borrowApy（前端已有）
-- 不需要 `rawDistributionMethod`、`vaultAPR`、`merklOppAPR` 等额外字段
+`aprCap` 仍保留原始 `targetAPR`，前端可用于展示"目标 APR = X%"。
 
 **为什么不需要 `rawDistributionMethod`**：
 
