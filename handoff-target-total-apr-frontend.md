@@ -31,9 +31,14 @@ TARGET_TOTAL_APR campaign 的 breakdown 已出现在 `/api/markets` 响应中：
 
 ### 1.2 已完成的映射
 
-7 种 `distributionMethod` 全部映射到 `TARGET_TOTAL_APR`：
+**2026-06-16 更新**：Level 1 (`distributionMethod`) 映射已移除（Aave 场景下始终为空字符串，从未命中）。当前使用 2 级映射：
 
-| distributionMethod | → campaignType | Aave lending 相关 |
+1. **Level 2**: `distributionType` 精确匹配
+2. **Level 3 fallback**: `distributionSettings.targetAPR` 存在且为正数 → `TARGET_TOTAL_APR`
+
+7 种 `distributionType` 映射到 `TARGET_TOTAL_APR`：
+
+| distributionType | → campaignType | Aave lending 相关 |
 |---|---|---|
 | `AAVE_NET_APR` | TARGET_TOTAL_APR | ✅ V3 |
 | `AAVE_V4_NET_APR` | TARGET_TOTAL_APR | ✅ V4 |
@@ -43,7 +48,9 @@ TARGET_TOTAL_APR campaign 的 breakdown 已出现在 `/api/markets` 响应中：
 | `SOFR_SPREAD_RATCHET` | TARGET_TOTAL_APR | ❌ vault-based |
 | `DEEL_DISTRIBUTION` | TARGET_TOTAL_APR | ❌ vault-based |
 
-映射表全部保留（防御性设计，Merkl 未来可能新增类型），但 **Aave lending 场景只有前两种**。后 5 种经 Merkl 官方 Schema API 确认全部是 ERC4626 vault-based（官方描述中明确写了 "ERC4626 vault" / "vault holders" / "vault-tracking campaign"），不适用于 lending protocol。
+**Aave lending 场景只有前两种**。后 5 种经 Merkl 官方 Schema API 确认全部是 ERC4626 vault-based。
+
+Level 3 fallback 确保未来 Merkl 新增 `distributionType` 变体时，只要有 `targetAPR` 字段就能正确分类，不需要改代码。
 
 ### 1.3 aprCap 语义
 
