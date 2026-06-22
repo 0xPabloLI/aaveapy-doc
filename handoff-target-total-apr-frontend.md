@@ -125,22 +125,7 @@ const isFixAprCampaign =
 
 `forecastState` 返回类型也需要加 `budgetBoundMode`（来自 `mergeForecastState`）。
 
-### 6.3 `rateSimulationCalculator.ts`：FORECAST_REQUIRING_CAMPAIGN_TYPES 添加 TARGET_TOTAL_APR
-
-**文件**: `src/lib/rateSimulationCalculator.ts` (行 114-117)
-
-```typescript
-const FORECAST_REQUIRING_CAMPAIGN_TYPES = new Set([
-  'MAX_REWARD_VALUE_PER_LIQUIDITY_VALUE',
-  'MAX_REWARD_VALUE_PER_LIQUIDITY_AMOUNT',
-  'FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE',
-  'FIX_REWARD_AMOUNT_PER_LIQUIDITY_VALUE',
-  'FIX_REWARD_AMOUNT_PER_LIQUIDITY_AMOUNT',
-  'TARGET_TOTAL_APR',  // 新增
-]);
-```
-
-### 6.4 `useRateSimulation.ts`：cap note 覆盖 TARGET_TOTAL_APR
+### 6.3 `useRateSimulation.ts`：cap note 覆盖 TARGET_TOTAL_APR
 
 **文件**: `src/hooks/useRateSimulation.ts` (行 774-787)
 
@@ -149,7 +134,7 @@ const FORECAST_REQUIRING_CAMPAIGN_TYPES = new Set([
 - `budgetBoundMode=MAX_APR` → 走 MAX 路径的 cap note（`APR_CAPPED` regime）
 - `budgetBoundMode=FIX_APR` → 走 FIX 路径的 cap note（`fixRewardableDays`）
 
-### 6.5 不需要改的
+### 6.4 不需要改的
 
 | 项目 | 原因 |
 |---|---|
@@ -162,8 +147,8 @@ const FORECAST_REQUIRING_CAMPAIGN_TYPES = new Set([
 
 ## 7. 建议实施顺序
 
-1. **P0**: 6.1 类型 + Schema；6.2 merklForecast.ts 路径修正；6.3 FORECAST_REQUIRING_CAMPAIGN_TYPES
-2. **P1**: 6.4 useRateSimulation.ts cap note
+1. **P0**: 6.1 类型 + Schema；6.2 merklForecast.ts 路径修正
+2. **P1**: 6.3 useRateSimulation.ts cap note
 3. **P2（defer）**: ERC4626 子类型支持（需要 vaultAPR 数据源，当前不可用）
 
 ---
