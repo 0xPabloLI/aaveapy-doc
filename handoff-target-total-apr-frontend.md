@@ -1,7 +1,7 @@
 # Handoff: TARGET_TOTAL_APR 前端适配
 
-**日期**: 2026-06-14
-**来源**: 后端 TARGET_TOTAL_APR 实现已部署 (commit `46fbd5a`)
+**日期**: 2026-06-16
+**来源**: 后端 TARGET_TOTAL_APR 全链路已实现 + Level 1 移除 + Level 3 fallback 已实现
 **对接人**: 前端 session
 **父 Issue**: AAV-833
 
@@ -127,44 +127,131 @@ campaignApr = apyToApr(max(incentiveAPY, 0)) // APY→APR，输出与 MAX/FIX �
 
 ---
 
-## 2. 前端核心变更
+## 2. 前端当前代码状态（2026-06-16 审查）
 
-### 2.1 新增 TARGET_TOTAL_APR 到前端 campaign type 联合类型
+### 2.0.1 `TARGET_TOTAL_APR` 当前在前端的行为
 
-### 2.2 APR 计算（2026-06-15 更新：后端已完成，前端无需计算）
+**问题：`TARGET_TOTAL_APR` 走错了 forecast 路径。**
 
-**后端已将 `campaignApr` 转换为 Merkl 实付 APR**，前端对 TARGET_TOTAL_APR 的 `campaignApr` 可与 MAX/FIX 完全相同的方式使用，**无需手动减 nativeAPY**。
+前端 `merklForecast.ts` 的分支逻辑：
 
-`aprCap` 仍保留原始 `targetAPR`，前端可用于展示"目标 APR = X%"。
+```typescript
+const isMaxAprCampaign =
+  forecastState.campaignType === 'MAX_REWARD_VALUE_PER_LIQUIDITY_VALUE' ||
+  forecastState.campaignType === 'MAX_REWARD_VALUE_PER_LIQUIDITY_AMOUNT';
+const isFixAprCampaign =
+  forecastState.campaignType === 'FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE' ||
+  forecastState.campaignType === 'FIX_REWARD_AMOUNT_PER_LIQUIDITY_VALUE' ||
+  forecastState.campaignType === 'FIX_REWARD_AMOUNT_PER_LIQUIDITY_AMOUNT';
+const isRateLimitedCampaign = isMaxAprCampaign || isFixAprCampaign;
+```
 
-**为什么不需要 `rawDistributionMethod`**：
+`TARGET_TOTAL_APR` 不匹配任何已知类型 → `isMaxAprCampaign=false`, `isFixAprCampaign=false` → **走 DUTCH_AUCTION 通用路径（无 APR cap、无 rate limiting）**。
 
-Aave lending 场景只有 `AAVE_NET_APR` 和 `AAVE_V4_NET_APR`，两者的公式完全相同：`max(targetAPR - nativeAPR, 0)`。`nativeAPR` 就是 reserve 自身的 APY，前端已有。`campaignType = TARGET_TOTAL_APR` 足以区分计算逻辑，不需要再展开子类型。
+但 TARGET_TOTAL_APR 应该根据 `budgetBoundMode` 走 MAX 或 FIX 路径，不是 Dutch-auction。
 
-**ERC4626 系列为什么不处理**：
+### 2.0.2 前端缺失的字段
 
-经 Merkl 官方 Schema API (`/v4/schemas/distributionMethod`) 确认，ERC4626_APR / ERC4626_SPREAD_CAPPED / ERC4626_TARGET_APR_WITH_MERKL / SOFR_SPREAD_RATCHET / DEEL_DISTRIBUTION 全部是 vault-based（公式中减的是 `vaultAPR` 而非 `nativeAPR`，且 Merkl 官方描述为 "tops up ERC4626 vault APR" / "vault-tracking campaign"）。后端当前无法获取 vaultAPR（Merkl API 不提供），因此这些类型短期不可实现。映射表保留（防御性），但前端不需要处理。
-
-### 2.3 Budget-bound 行为与 Simulation
-
-`budgetBoundMode` 透传后（P1），前端 simulation 需要区分：
-
-| budgetBoundMode | budget 充足时 | budget 不足时 | simulation 公式 |
+| 字段 | 前端类型 | Zod schema | 说明 |
 |---|---|---|---|
-| `MAX_APR` | `max(aprCap - nativeAPR, 0)` | APR 被 TVL 稀释降到 target 以下 | `min(max(aprCap - nativeAPR, 0), remainingBudgetRate / TVL × 365)` |
-| `FIX_APR` | `max(aprCap - nativeAPR, 0)` | campaign 提前结束 | `max(aprCap - nativeAPR, 0)`（固定直到 budget 耗尽） |
+| `budgetBoundMode` | ❌ 缺失 | ❌ 缺失 | 后端已输出，前端未消费 |
+| `distributionMethod` / `rawDistributionMethod` | N/A | N/A | 前端从未读取，后端已移除，零影响 |
 
-**不是 DUTCH_AUCTION 模式**。TARGET_TOTAL_APR 与 MAX/FIX 同族——有 cap（targetAPR），budget 不足时的行为取决于 budgetBoundMode。
+### 2.0.3 `campaignApr` 已由后端转换
 
-当前 3 个活跃 campaign 的 budgetBoundMode 全部是 `MAX_APR`。
+后端已将 TARGET_TOTAL_APR 的 `campaignApr` 从 `targetAPR` 转换为 Merkl 实付 APR（见 Section 1.3.1）。前端对 `campaignApr` 的使用方式与 MAX/FIX/DUTCH **完全一致**，无需特殊处理。
 
-### 2.4 Forecast
+### 2.0.4 Zod schema 兼容性
 
-forecast API 返回 `requiredDaily`、`remainingBudget` 等，TARGET_TOTAL_APR 的 forecast 逻辑与 MAX 完全一致（budget 估算，不做 dilutive 计算）。前端无需额外处理。
+`campaignType: z.string().optional()` — 不拒绝新值 `TARGET_TOTAL_APR`，但也不做特殊处理。Zod 使用 `.passthrough()`，未知字段（如 `budgetBoundMode`）会被透传不会报错，但 TypeScript 类型定义需要更新才能在代码中访问。
 
 ---
 
-## 3. 后端需要补充的工作
+## 3. 前端需要做的改动
+
+### 3.1 类型 + Schema：添加 `budgetBoundMode`
+
+**文件**: `src/types/aave.ts`
+
+```typescript
+export interface MerklCampaignBreakdown extends BaseCampaignBreakdown {
+  campaignId: string;
+  whitelistOnly?: boolean;
+  pointsPerThousandUsd?: number;
+  campaignType?: string;
+  totalBudget?: number;
+  aprCap?: number | null;
+  latestTvl?: number;
+  plannedDaily?: number;
+  budgetBoundMode?: string;  // ← 新增：'MAX_APR' | 'FIX_APR'
+  rewardTokenSymbol?: string;
+  rewardTokenIconUrl?: string;
+}
+```
+
+**文件**: `src/lib/apiSchemas.ts` — 对应 Zod schema 添加 `budgetBoundMode: z.string().optional()`
+
+### 3.2 `merklForecast.ts`：TARGET_TOTAL_APR 按 budgetBoundMode 归入正确路径
+
+**文件**: `src/lib/merklForecast.ts` (行 51-57)
+
+当前逻辑只识别 5 种 campaignType。需要让 `TARGET_TOTAL_APR` 根据 `budgetBoundMode` 归入 MAX 或 FIX：
+
+```typescript
+// 改动示意（具体实现可调整）
+const isMaxAprCampaign =
+  forecastState.campaignType === 'MAX_REWARD_VALUE_PER_LIQUIDITY_VALUE' ||
+  forecastState.campaignType === 'MAX_REWARD_VALUE_PER_LIQUIDITY_AMOUNT' ||
+  (forecastState.campaignType === 'TARGET_TOTAL_APR' && forecastState.budgetBoundMode === 'MAX_APR');
+const isFixAprCampaign =
+  forecastState.campaignType === 'FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE' ||
+  forecastState.campaignType === 'FIX_REWARD_AMOUNT_PER_LIQUIDITY_VALUE' ||
+  forecastState.campaignType === 'FIX_REWARD_AMOUNT_PER_LIQUIDITY_AMOUNT' ||
+  (forecastState.campaignType === 'TARGET_TOTAL_APR' && forecastState.budgetBoundMode === 'FIX_APR');
+```
+
+**`forecastState` 类型也需要添加 `budgetBoundMode`** — 来自 `mergeForecastState` 返回值。
+
+### 3.3 `useRateSimulation.ts`：cap note 覆盖 TARGET_TOTAL_APR
+
+**文件**: `src/hooks/useRateSimulation.ts` (行 774-787)
+
+当前 cap note 逻辑只对 `FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE` 和 `MAX_REWARD_VALUE_PER_LIQUIDITY_VALUE` 生成。TARGET_TOTAL_APR 的 cap 语义不同（是"总 APR 目标"而非"Merkl 实付上限"），但 `campaignApr` 已由后端转为实付 APR，所以：
+
+- `budgetBoundMode=MAX_APR` → 走 MAX 路径的 cap note（APR_CAPPED regime）
+- `budgetBoundMode=FIX_APR` → 走 FIX 路径的 cap note（fixRewardableDays）
+
+### 3.4 `FORECAST_REQUIRING_CAMPAIGN_TYPES`：添加 TARGET_TOTAL_APR
+
+**文件**: `src/lib/rateSimulationCalculator.ts` (行 114-117)
+
+```typescript
+const FORECAST_REQUIRING_CAMPAIGN_TYPES = new Set([
+  'MAX_REWARD_VALUE_PER_LIQUIDITY_VALUE',
+  'MAX_REWARD_VALUE_PER_LIQUIDITY_AMOUNT',
+  'FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE',
+  'FIX_REWARD_AMOUNT_PER_LIQUIDITY_VALUE',
+  'FIX_REWARD_AMOUNT_PER_LIQUIDITY_AMOUNT',
+  'TARGET_TOTAL_APR',  // ← 新增
+]);
+```
+
+### 3.5 campaignApr 使用方式
+
+**无需改动。** 后端已将 TARGET_TOTAL_APR 的 `campaignApr` 转换为 Merkl 实付 APR，前端可直接与其他类型一样使用。
+
+### 3.6 不需要改的
+
+| 项目 | 原因 |
+|---|---|
+| `campaignApr` 计算 | 后端已完成 APR↔APY 转换 + nativeAPY 减法，前端直接用 |
+| `distributionMethod` / `rawDistributionMethod` | 前端从未读取，零影响 |
+| Zod 解析 | `z.string().optional()` 不拒绝新值，`.passthrough()` 不拒绝新字段 |
+| `mergeForecastState` 的 `!campaignType` guard | 后端已确保 TARGET_TOTAL_APR 有 `campaignType`，不会返回 null |
+
+---
+
+## 4. 后端已完成的工作
 
 ### P1: 透传 budgetBoundMode — ✅ 已完成 (2026-06-15)
 
@@ -181,7 +268,7 @@ forecast API 返回 `requiredDaily`、`remainingBudget` 等，TARGET_TOTAL_APR �
 
 ---
 
-## 4. 当前 Aave 活跃的 TARGET_TOTAL_APR Campaign
+## 5. 当前 Aave 活跃的 TARGET_TOTAL_APR Campaign
 
 | campaignId | distributionMethod | reserve | side | targetAPR (aprCap) | budgetBoundMode |
 |---|---|---|---|---|---|
@@ -193,15 +280,15 @@ forecast API 返回 `requiredDaily`、`remainingBudget` 等，TARGET_TOTAL_APR �
 
 ---
 
-## 5. 建议的前端实施顺序
+## 6. 建议的前端实施顺序
 
-1. **P0**: 新增 TARGET_TOTAL_APR 到前端类型；`merklActualAPR = max(aprCap - nativeAPR, 0)`
-2. **P1**: 后端透传 `budgetBoundMode`；前端据此区分 dilutive vs early-end simulation 逻辑
+1. **P0**: 类型 + Schema 添加 `budgetBoundMode`；`merklForecast.ts` 让 TARGET_TOTAL_APR 按 budgetBoundMode 归入 MAX/FIX 路径；`FORECAST_REQUIRING_CAMPAIGN_TYPES` 添加 TARGET_TOTAL_APR
+2. **P1**: `useRateSimulation.ts` cap note 覆盖 TARGET_TOTAL_APR
 3. **P2（defer）**: ERC4626 子类型支持（需要 vaultAPR 数据源，当前不可用）
 
 ---
 
-## 6. 术语澄清
+## 7. 术语澄清
 
 ### campaignType vs distributionMethod vs budgetBoundMode — 三个正交维度
 
@@ -224,7 +311,7 @@ Aave lending 场景下：`campaignType = TARGET_TOTAL_APR` 已足够区分计算
 
 ---
 
-## 7. 共享文档
+## 8. 共享文档
 
 - **`aaveapy-doc/merkl-distribution-types.md`** — 4 大 Family + 7 种子类型 + budget-bound mode + APR 公式 + dilutive 示例
 - **`docs/adr/0024-merkl-campaign-type-multi-level-mapping.md`** — 映射表 + APR cap 语义差异
