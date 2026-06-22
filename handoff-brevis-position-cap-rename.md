@@ -1,6 +1,6 @@
 # Handoff: Brevis `perUserRewardCapUsd` → `positionCap`
 
-**日期**: 2026-06-16 · Updated: 2026-06-17
+**日期**: 2026-06-16
 **类型**: Breaking API Change — `GET /api/markets`
 **关联**: AAV-865
 
@@ -8,8 +8,15 @@
 
 1. `perUserRewardCapUsd` → `positionCap`（已完成 ✅）
 2. `mapActionType` 扩展，加入 5001/5002/5003/6001（已完成 ✅）
-3. ~~新增 `positionCapScope`~~ → **不需要**，前端已按 campaignId 去重推导 shared cap（YAGNI）
-4. ~~3001 combined bug 修复~~ → **前端已解决**，`computeBrevisSharedCampaignDeposits` 按 campaignId 跨 supplys/borrows 去重
+3. 去掉 `type === 3001` 过滤（已完成 ✅）
+
+### 决策：不加 positionCapScope
+
+在 grill 过程中确认：前端已按 `campaignId` 去重推导 shared cap（`computeBrevisSharedCampaignDeposits`），后端不需要额外加 `positionCapScope` 字段。YAGNI。
+
+### 决策：不需要修复 3001 combined bug
+
+前端 `computeBrevisSharedCampaignDeposits` 已解决同一 campaignId 在 supply 和 borrow 中共享 cap 的问题。后端保持现状即可。
 
 ## Position Cap 语义确认（铁证，勿反复讨论）
 
@@ -29,59 +36,81 @@ eligiblePosition = min(supplyPosition + borrowPosition, positionCap)
 
 ---
 
-## 已完成的工作 ✅
-
-### 后端
+## 已完成的后端工作 ✅
 
 | 变更 | 文件 |
 |---|---|
 | `perUserRewardCapUsd` → `positionCap` | shared-contracts, brevis-api, incentive-prune, tests, OpenAPI |
 | 拆出 `extractPositionCapFromDescription()` | brevis-api.ts |
 | 去掉 `type === 3001` 过滤 | brevis-api.ts |
-| 清理 `budgetNormalizedAmount` / `budgetTokenSymbol` | generate-openapi.ts, OpenAPI spec |
 | `mapActionType` 扩展 5001/5002/5003/6001 | brevis-api.ts |
-| 文档更新 | api-documentation.md, brevis-supplement.md |
-
-### 前端
-
-| 变更 | 状态 |
-|---|---|
-| `perUserRewardCapUsd` → `positionCap` 重命名 | ✅ 已完成，零残留 |
-| 清理 `budgetNormalizedAmount` / `budgetTokenSymbol` | ✅ 已完成，零残留 |
-| Shared cap 去重逻辑 | ✅ 已完成（`computeBrevisSharedCampaignDeposits` 按 campaignId 去重） |
+| 清理 `budgetNormalizedAmount` / `budgetTokenSymbol` | generate-openapi.ts, OpenAPI spec |
+| 文档更新（铁证 + action type 映射） | api-documentation.md, brevis-supplement.md |
 
 ---
 
-## `positionCapScope` 为何不需要
+## 前端工作 🔲
 
-前端 `rateSimulationCalculator.ts:465-524` 的 `computeBrevisSharedCampaignDeposits` 已实现：
+### 1. 重命名字段
 
-| 条件 | positionCap 语义 |
-|---|---|
-| 同 `campaignId` 在 supplys + borrows 两边 + 元数据一致 | **合计**（`isSharedSupplyBorrow: true`） |
-| 同 `campaignId` 两边但元数据不一致 | **独立**（跳过共享，warn） |
-| `campaignId` 仅在单侧 | **独立** |
-| 无 `campaignId` | **独立** |
+```
+perUserRewardCapUsd → positionCap
+```
 
-`positionCapScope` 与 `actionType` 是 1:1 映射（`supply`↔`supply`，`borrow`↔`borrow`，`both`↔`combined`），信息冗余。前端已能从数据结构（同 campaignId 跨数组）推导 shared cap，不需要后端额外传 scope 字段。按 YAGNI 原则，不加。
+### 2. Position cap 语义
+
+5000 USDC 是 **supply + borrow 合计持仓**上限，不是各自独立。前端 `computeBrevisSharedCampaignDeposits` 已按 campaignId 去重处理。
+
+### 3. 清理 `budgetNormalizedAmount` / `budgetTokenSymbol`
+
+这两个字段已从 API 移除，前端 Zod schema 中如有可删。
 
 ---
 
-## `mapActionType` 完整映射
+## API 输出示例
 
-| Code | 协议 | actionType | 证据来源 |
+```json
+{
+  "brevisSupplys": [{
+    "link": "https://incentra.brevis.network/campaign/",
+    "name": "MetaMask Card",
+    "message": "Eligible MetaMask Card users...",
+    "breakdowns": [{
+      "campaignApr": 2.4,
+      "campaignStartedAt": "2025-08-13T13:00:00.000Z",
+      "campaignEndedAt": "2026-08-08T00:00:00.000Z",
+      "campaignId": "1754995104",
+      "campaignType": "FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE",
+      "aprCap": 2.4,
+      "latestTvl": 4151203.07,
+      "totalBudget": 9998600,
+      "positionCap": 5000
+    }]
+  }]
+}
+```
+
+## 字段映射表
+
+| 旧字段名 | 新字段名 | 类型 | 说明 |
 |---|---|---|---|
-| 2001 | Euler borrow | `borrow` | 官方文档 Incentra docs: Euler campaigns |
-| 2002 | Euler lend | `supply` | 官方文档 Incentra docs: Euler campaigns |
-| 3001 | Aave both (gRPC 实测) | `both` | gRPC 运行时数据 + 项目代码映射 |
-| 5001 | Aave lend | `supply` | 官方文档 Incentra docs: Aave campaigns |
-| 5002 | Aave borrow | `borrow` | 官方文档 Incentra docs: Aave campaigns |
-| 5003 | Aave lend_net | `supply` | 官方文档 Incentra docs: Aave campaigns |
-| 6001 | Morpho lend | `supply` | 官方文档 Incentra docs: Morpho campaigns |
+| `perUserRewardCapUsd` | `positionCap` | `number?` | 持仓上限 USD |
+| `budgetNormalizedAmount` | _(已移除)_ | — | 内部字段，不对外 |
+| `budgetTokenSymbol` | _(已移除)_ | — | 内部字段，不对外 |
 
-5001/5002/5003/6001 尚未在 gRPC 响应中观察到，但有官方文档依据，提前加入 `mapActionType`。
+## 更新后的 Brevis Breakdown 完整字段表
 
----
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| campaignApr | number | 百分数（后端已 ×100） |
+| campaignStartedAt | string | ISO 8601 |
+| campaignEndedAt | string | ISO 8601 |
+| campaignId | string | 必选 |
+| campaignType | string? | 当前固定 `FIX_REWARD_VALUE_PER_LIQUIDITY_VALUE` |
+| aprCap | number? | = campaignApr |
+| totalBudget | number? | USD |
+| latestTvl | number? | USD |
+| **positionCap** | **number?** | **持仓上限 USD（combined: supply + borrow 合计）** |
 
 ## 关联文档
 
