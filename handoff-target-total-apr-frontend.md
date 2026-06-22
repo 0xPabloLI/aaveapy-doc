@@ -8,9 +8,13 @@
 
 ## 1. 背景
 
-Merkl 有一种"Target Total APR"分发模式：Merkl 只支付 `targetAPR - nativeAPR` 的差额，不是全额。后端已完成全部适配，API 已输出 `campaignType: "TARGET_TOTAL_APR"` + `budgetBoundMode` + 转换后的 `campaignApr`。
+Merkl 有一种"Target Total APR"分发模式：Merkl 只支付 `targetAPR - nativeAPR` 的差额，不是全额。后端已完成全部适配：
 
-**前端当前问题**：`TARGET_TOTAL_APR` 不在 `merklForecast.ts` 的已知类型列表中，走的是 Dutch-auction 通用路径（无 APR cap、无 rate limiting），**forecast 模拟结果不准确**。
+- **campaign type 识别**：Level 1（`distributionMethod`）已移除，Level 3 fallback（`targetAPR` 存在且为正 → `TARGET_TOTAL_APR`）已添加
+- **breakdown / forecast 字段路由**：TARGET_TOTAL_APR 无独立静态规则，由 `budgetBoundMode` 动态决定走 MAX 或 FIX 路径（无 budgetBoundMode 时 throw，不做默认 fallback）
+- **API 输出**：`campaignType: "TARGET_TOTAL_APR"` + `budgetBoundMode` + 转换后的 `campaignApr`
+
+**前端当前问题**：后端 forecast API 已正确路由，但前端 `merklForecast.ts` 的 `isRateLimitedCampaign` 不识别 `TARGET_TOTAL_APR` → **forecast rate limiting 不生效**，模拟中无法正确反映 budget 约束。
 
 ---
 
@@ -109,7 +113,7 @@ budgetBoundMode: z.string().optional(),
 
 **文件**: `src/lib/merklForecast.ts` (行 51-57)
 
-当前 `TARGET_TOTAL_APR` 不匹配任何已知类型 → 走 Dutch-auction 路径（错误）。改为根据 `budgetBoundMode` 归入 MAX 或 FIX：
+当前 `TARGET_TOTAL_APR` 不匹配前端 `isRateLimitedCampaign` 的任何已知类型 → forecast rate limiting 不生效。改为根据 `budgetBoundMode` 归入 MAX 或 FIX：
 
 ```typescript
 const isMaxAprCampaign =
@@ -139,7 +143,7 @@ const isFixAprCampaign =
 | 项目 | 原因 |
 |---|---|
 | `campaignApr` 计算 | 后端已做 APR↔APY 转换 + nativeAPY 减法，前端直接用 |
-| `distributionMethod` / `rawDistributionMethod` | 前端从未读取，零影响 |
+| `distributionMethod` / `rawDistributionMethod` | 后端已移除 Level 1 映射，前端从未读取，零影响 |
 | Zod 解析 | `z.string().optional()` 不拒绝新值，`.passthrough()` 不拒绝新字段 |
 | `mergeForecastState` 的 `!campaignType` guard | 后端已确保 TARGET_TOTAL_APR 有 `campaignType`，不会返回 null |
 
