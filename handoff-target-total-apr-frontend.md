@@ -175,7 +175,7 @@ forecast API 返回 `requiredDaily`、`remainingBudget` 等，TARGET_TOTAL_APR �
 | 字段 | 原因 |
 |---|---|
 | `spreadCap` | 已移除（YAGNI）。Vault 模式预留：未来 ERC4626 支持时需重新引入 `spreadCap`（来源 `distributionSettings.cap`）+ `vaultAPR` 数据源 |
-| `rawDistributionMethod` | Aave lending 场景只有 AAVE_NET_APR / AAVE_V4_NET_APR，公式相同，不需要区分子类型 |
+| `rawDistributionMethod` | 已移除（2026-06-16）。Level 1 mapping 从未命中，`distributionType` Level 2 + `targetAPR` Level 3 fallback 已完全覆盖 |
 | `vaultAPR` | Merkl API 不提供，无法透传 |
 | `merklOppAPR` | 需聚合同 reserve 上其他 opportunity，当前未实现 |
 
@@ -211,7 +211,7 @@ forecast API 返回 `requiredDaily`、`remainingBudget` 等，TARGET_TOTAL_APR �
 | 二级分类 | `distributionMethod` | 具体公式（被减数来源） | Aave lending 不需要区分 |
 | budget 行为 | `budgetBoundMode` | budget 用尽后的 fallback 策略 | simulation 模式选择 |
 
-Aave lending 场景下：`campaignType = TARGET_TOTAL_APR` 已足够区分计算逻辑，不需要透传 `distributionMethod`。`budgetBoundMode` 是正交维度，影响 simulation。
+Aave lending 场景下：`campaignType = TARGET_TOTAL_APR` 已足够区分计算逻辑，不需要透传 `distributionMethod`（Level 1 mapping 已移除，Level 3 targetAPR fallback 提供前向兼容）。`budgetBoundMode` 是正交维度，影响 simulation。
 
 ### aprCap 语义差异（重申）
 
