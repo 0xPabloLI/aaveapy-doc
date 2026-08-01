@@ -153,7 +153,10 @@ User deposits stablecoin → Stable Vault (Accounting Chain, e.g. Arbitrum)
 
 - **SubVault**: Each deposit accrues at a fixed per-second rate. Returns stay predictable regardless of underlying market rate movements.
 - **Off-chain rebalancer**: Continuously optimizes allocations across approved ERC-4626 yield adapters to sustain committed rates.
-- **Surplus/deficit absorption**: If market yield > stable rate → surplus accumulates (sweepable to treasury). If market yield < stable rate → system absorbs the shortfall; principal is always guaranteed.
+- **Surplus/deficit absorption (3-layer defense)**:
+  1. **Off-chain rebalancer** (Manager role): First line — continuously moves allocations to higher-yielding approved strategies when one strategy's yield drops.
+  2. **Surplus buffer**: When market yield > stable rate, surplus accumulates. This buffer is consumed first when market yield < stable rate. An authorized caller may sweep surplus to treasury, but "never in a way that would leave the vault unable to cover what it owes."
+  3. **Authorized party top-up**: If surplus is exhausted, an authorized party (Integrator role — for Aave App, this is Aave DAO/Labs) tops up the system to keep all earned interest fully withdrawable. **Principal is always guaranteed** — even if all yield strategies fail to earn anything, depositors get their principal back.
 - **Multi-asset**: Deposit USDC, withdraw USDT (1:1 exchange enforced at contract level; slippage covered by external Slippage Coverage Vault, not user deposits).
 - **Multi-chain**: Accounting Chain (Arbitrum) + Earning Chains (Ethereum), connected via CCIP/LayerZero/Hyperlane/Across. Chainlink oracle publishes balance snapshots.
 - **Powering Aave App**: Stable Vaults powers the Aave App (iOS) earn experience.
