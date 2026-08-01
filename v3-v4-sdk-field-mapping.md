@@ -106,6 +106,8 @@
 |-----------|------|----------|-----|-----------|
 | `deficit` | `string`, raw | Deficit | N/A (SDK 不提供), 默认 `'0'` | 链上 RPC (`UiPoolDataProvider`) |
 | `borrowingState` | `string` (V3 only) | borrow disabled | 通过 `canBorrow` 间接判断 | `reserve.borrowInfo?.borrowingState` |
+| `ltv` | `number`, percent | Portfolio LTV constraint (AAV-756) | `settings.collateralFactor.value` → `percentValueToPercent()` | `supplyInfo.maxLTV.value` → `percentValueToPercent()` |
+| `liquidationThreshold` | `number`, percent | Health Factor (AAV-756) | = `ltv` (V4 collateralFactor 合并) | `supplyInfo.liquidationThreshold.value` → `percentValueToPercent()` |
 
 ---
 
