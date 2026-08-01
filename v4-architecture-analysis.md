@@ -75,22 +75,46 @@ A user with positions in multiple Spokes has **completely independent** data in 
 
 > ⚠️ **The original version of this document contained speculative scenarios (E-Mode Spoke, Isolation Spoke) that incorrectly attributed V3 concepts to V4. V4 has no E-Mode or Isolation Mode.**
 
-### Actual deployed Spokes (Ethereum, as of 2026-08-01)
+> **Spoke list is dynamic**: Governance can add, modify, or retire Spokes at any time. The table below reflects on-chain data as of 2026-08-01. It will change.
 
-| Spoke | Reserves | targetHealthFactor | Description |
-|-------|----------|-------------------|-------------|
-| Main | 14 | 1.24 | Blue-chip assets (ETH, WBTC, USDC, etc.) |
-| Bluechip | 11 | 1.174 | Blue-chip focused, different risk profile |
-| Gold | 8 | 1.307 | Highest targetHealthFactor — most conservative |
-| Lombard | 3 | 1.061 | LBTC-related |
-| Forex | 7 | 1.044 | Forex/stablecoin focused |
-| Ethena Ecosystem | 10 | 1.033 | USDe/sUSDe ecosystem |
-| USDG Pendle | 4 | 1.027 | USDG + Pendle integration |
-| Ethena Correlated | 4 | 1.027 | Ethena correlated assets |
-| AVAX Correlated | 2 | — | AVAX correlated (Avalanche chain) |
-| Lido | 2 | 1.013 | wstETH-related |
-| Etherfi | 2 | 1.019 | eETH-related |
-| Kelp | 2 | 1.021 | rsETH-related |
+### Hubs
+
+V4 uses multiple Hubs per chain. As of 2026-08-01, 4 Hubs are deployed:
+
+| Hub | Chain | Description |
+|-----|-------|-------------|
+| Core Hub | Ethereum, Avalanche | Primary hub, most Spokes connect here |
+| Plus Hub | Ethereum | Ethena-focused |
+| Prime Hub | Ethereum | Bluechip (higher risk profile) |
+| Global Dollar Hub | Ethereum | USDG-specific |
+
+> Official V4 docs (`aave-v4/liquidity/hubs`) name three: Core, Plus, Prime. The Global Dollar Hub and cross-Hub Spokes are visible in SDK data but not yet in official docs.
+
+### Actual deployed Spokes (on-chain SDK data, as of 2026-08-01)
+
+| Chain | Hub | Spoke | Reserves | targetHealthFactor |
+|-------|-----|-------|----------|-------------------|
+| Ethereum | Core | Main | 14 | 1.24 |
+| Ethereum | Core | Bluechip | 4 | 1.174 |
+| Ethereum | Core | Gold | 8 | 1.307 |
+| Ethereum | Core | Lombard | 3 | 1.061 |
+| Ethereum | Core | Forex | 7 | 1.044 |
+| Ethereum | Core | Ethena Ecosystem | 3 | 1.033 |
+| Ethereum | Core | USDG Pendle | 1 | 1.027 |
+| Ethereum | Core | Lido | 2 | 1.013 |
+| Ethereum | Core | Etherfi | 2 | 1.019 |
+| Ethereum | Core | Kelp | 2 | 1.021 |
+| Ethereum | Plus | Ethena Ecosystem | 7 | 1.033 |
+| Ethereum | Plus | Ethena Correlated | 4 | 1.027 |
+| Ethereum | Prime | Bluechip | 7 | 1.174 |
+| Ethereum | Global Dollar | USDG Pendle | 3 | 1.027 |
+| Avalanche | Core | Main | 6 | 1.24 |
+| Avalanche | Core | Forex | 3 | 1.044 |
+| Avalanche | Core | AVAX Correlated | 2 | — |
+
+> Official V4 docs list a **Treasury Spoke** (`0xB9B0b861...`) on Ethereum which does not appear in SDK reserve data — likely has 0 reserves or is a different Spoke variant.
+
+**Key observation**: The same Spoke name (e.g., Bluechip, Ethena Ecosystem, USDG Pendle) can connect to different Hubs with different Reserves. This is by design — a Spoke connects to one or more Hubs.
 
 Observed configuration patterns (on-chain data, not design intent):
 - Main, Bluechip, Gold: `healthFactorForMaxBonus=0.90`, `liquidationBonusFactor=9000` (90%)
@@ -115,8 +139,8 @@ Observed configuration patterns (on-chain data, not design intent):
 | E-Mode | **User-selectable mode** within a Pool: user enters a category → that category overrides LTV and LT for assets in the category bitmap | **Removed entirely**. V4 has no user-selectable mode, no category concept, no bitmap override. Per-Reserve `collateralFactor` is always-on and protocol-set, not conditional on user mode. |
 | Isolation Mode | `isolated` flag on asset, `debtCeiling`, `borrowableInIsolation` | **Removed**. Spoke isolation + Hub `drawCap` — each Spoke is inherently isolated, `drawCap` limits exposure. |
 | Siloed Borrowing | `SILOED_BORROWING` flag — prevents borrowing a siloed asset alongside others | **Removed**. Spoke-level `borrowable` flag + `frozen`/`paused` replaces this. |
-| FlashLoan | `flashLoan()`, `setFlashLoanEnabled()`, `_flashLoanPremium` — single-transaction borrowing without collateral | **Removed**. Zero matches in V4 contract source code. |
-| Stable Rate Borrowing | `stableDebtToken`, `stableBorrowRate`, `rebalanceStableBorrowPosition` — fixed-rate borrowing option | **Removed**. V4 has only one borrow mode (variable, via `drawnShares` + `drawnIndex`). |
+| Stable Rate Borrowing | `stableDebtToken`, `stableBorrowRate` — **deprecated in V3.2.0** (enum value renamed to `__DEPRECATED`, `stableDebtTokenAddress` deprecated) | **Not present**. V3.2.0 already deprecated stable rate; V4 continues without it. V4 has only one borrow mode (variable, via `drawnShares` + `drawnIndex`). |
+| FlashLoan | V3: `flashLoan()`, `flashLoanSimple()`, `setFlashLoanEnabled()` | **Present in V4** — V4 docs mention a 0.05% flash loan fee for position swaps (`aave.com/docs/aave-v4/tools/swaps`). Not in V4 `Spoke.sol` source; likely implemented as a separate module. |
 | aToken / variableDebtToken | ERC20 tokens representing supply/borrow positions | **Removed**. Positions tracked internally in `UserPosition` (non-transferable). |
 
 > **Key distinction on E-Mode**: V3 E-Mode was not simply "higher LTV for certain assets" — V3 could already set per-Reserve LTV. E-Mode was a **user-selectable override**: the same Reserve had different LTV/LT depending on whether the user was in E-Mode or not. V4 has no such mechanism — each Reserve has one `collateralFactor` (at a given config version), regardless of what else the user does. You cannot "enter a mode" to get better terms in V4.
@@ -149,7 +173,7 @@ V4 has a **TokenizationSpoke** variant — an ERC4626 vault that coexists with r
 | `aToken` | ERC20 | (none) | — | **V4 removed**: positions tracked internally in `UserPosition` |
 | `variableDebtToken` | ERC20 | (none) | — | **V4 removed**: debt tracked internally via `drawnShares` + `drawnIndex` |
 | `stableDebtToken` | ERC20 | (none) | — | **V4 removed**: stable rate borrowing eliminated, only variable mode |
-| FlashLoan | `FlashLoanLogic`, `_flashLoanPremium` | (none) | — | **V4 removed**: no flash loan in contract source or overview.md |
+| FlashLoan | `FlashLoanLogic`, `_flashLoanPremium` | FlashLoan fee | V4 Tools (position swaps) | **V4 has it**: 0.05% fee per V4 docs (`aave-v4/tools/swaps`), not in Spoke.sol source |
 | `liquidityIndex` | implicit fee deduction | `exchangeRate` | `addedShares / totalAddedAssets` | **V4 redesign**: explicit shares-based accounting |
 | `borrowIndex` | full debt growth | `drawnIndex` | `Asset.drawnIndex` | **Semantic equivalent**: single debt index |
 | `deficit` | `reserve.deficit` | `deficitRay` | `Asset.deficitRay` + `SpokeData.deficitRay` | **V4 enhanced**: dual-layer tracking |
@@ -158,7 +182,36 @@ V4 has a **TokenizationSpoke** variant — an ERC4626 vault that coexists with r
 
 ---
 
-## 5. Shares-Based Accounting Model
+## 5. Position Swaps & FlashLoan
+
+### V4 Position Swap mechanism
+
+V4 natively integrates position swap functionality that V3 required external adapters (`ParaSwapLiquiditySwapAdapter`, `ParaSwapDebtSwapAdapterV3`) to achieve. Three swap types:
+
+| Swap type | V4 activity type | What it does |
+|-----------|-----------------|--------------|
+| **SupplySwap** | `SupplySwapActivity` | Supply asset A → auto-swap to asset B → supply B |
+| **BorrowSwap** | `BorrowSwapActivity` | Borrow asset A → auto-swap to asset B → receive B |
+| **WithdrawSwap** | `WithdrawSwapActivity` | Withdraw asset A → auto-swap to asset B → receive B |
+
+These swaps use an external DEX aggregator (ParaSwap or similar) and are atomic — the swap and the supply/borrow/withdraw happen in a single transaction.
+
+### FlashLoan in V4
+
+When a position swap requires temporarily borrowing assets (e.g., to swap collateral from ETH to WBTC, you need to borrow WBTC, swap ETH→WBTC, repay), V4 uses an internal flash loan mechanism:
+
+- **Fee**: 0.05% of the borrowed amount, collected by the protocol treasury [3]
+- **Scope**: Only for position swaps, not a standalone `flashLoan()` function like V3
+
+This differs from V3:
+- V3: `flashLoan()` and `flashLoanSimple()` were standalone functions anyone could call for any purpose
+- V4: Flash loan is internal to the swap tool — users don't call it directly; it's used when the swap engine needs temporary liquidity
+
+> Source: V4 official docs (`aave-v4/tools/swaps`) [3]
+
+---
+
+## 6. Shares-Based Accounting Model
 
 > "Shares-based" is not an official V4 term — it is our descriptive label for V4's internal accounting redesign. V4 `docs/overview.md` describes the mechanism but does not give it a single name.
 
@@ -183,7 +236,7 @@ V4 **removes `aToken` and `variableDebtToken` entirely**. Instead, positions are
 
 ---
 
-## 6. Dynamic Risk Configuration
+## 7. Dynamic Risk Configuration
 
 V3 has a single, global risk configuration per asset. Any parameter change immediately affects every open position, creating governance overhead and potential harm through unexpected liquidations [1].
 
@@ -232,7 +285,7 @@ The key insight: **config refresh is tied to risk direction, not asset identity*
 
 ---
 
-## 7. Liquidation Engine
+## 8. Liquidation Engine
 
 ### Key differences from V3
 
@@ -262,6 +315,7 @@ where `minBonus = (maxLiquidationBonus - 100%) × liquidationBonusFactor + 100%`
 
 [1] Aave V4 Overview Document. GitHub. https://github.com/aave/aave-v4/blob/main/docs/overview.md
 [2] Aave V4 Contract Source Code. GitHub. https://github.com/aave/aave-v4/tree/main/src
+[3] Aave V4 Official Documentation. https://aave.com/docs/aave-v4
 
 ## Companion Documents
 
