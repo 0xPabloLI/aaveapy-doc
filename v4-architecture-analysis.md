@@ -112,13 +112,53 @@ V4 uses multiple Hubs per chain. As of 2026-08-01, 4 Hubs are deployed:
 | Avalanche | Core | Forex | 3 | 1.044 |
 | Avalanche | Core | AVAX Correlated | 2 | — |
 
-> Official V4 docs list a **Treasury Spoke** (`0xB9B0b861...`) on Ethereum which does not appear in SDK reserve data — likely has 0 reserves or is a different Spoke variant.
+> Official V4 docs list a **Treasury Spoke** (`0xB9B0b8616f6Bf6841972a52058132BE08d723155`) on Ethereum. Etherscan analysis of its implementation contract (`0xECc0B581F2E7a5D9eB79b01a4972475f03F2076e`) reveals a **simplified Spoke variant** for protocol treasury management:
+> - ABI includes: `supply(hub, underlying, amount)`, `supplySkimmed()`, `withdraw()`, `getSuppliedAssets()`, `getSuppliedShares()`, `transfer(token, to, amount)`, `SPOKE_REVISION`
+> - **No `borrow` / `repay` / `liquidationCall`** — not a user-facing market Spoke
+> - 0 ETH balance, 0 reserves, 1 transaction (Transfer Ownership, 131 days ago)
+> - Not visible on pro.aave.com V4 interface — it's infrastructure, not a user product
+> - Purpose: deploy Aave DAO treasury idle funds into Hubs to earn yield
 
 **Key observation**: The same Spoke name (e.g., Bluechip, Ethena Ecosystem, USDG Pendle) can connect to different Hubs with different Reserves. This is by design — a Spoke connects to one or more Hubs.
 
 Observed configuration patterns (on-chain data, not design intent):
 - Main, Bluechip, Gold: `healthFactorForMaxBonus=0.90`, `liquidationBonusFactor=9000` (90%)
 - LST + Ethena + Forex Spokes: `healthFactorForMaxBonus=0.99`, `liquidationBonusFactor=10000` (100%)
+
+### V4 user interface
+
+V4 is accessible at **pro.aave.com** (not app.aave.com which is V3-only). The navigation explicitly labels: "Aave Pro = V4, The full power of DeFi" vs "Aave = V3, The original DeFi protocol".
+
+pro.aave.com features:
+- Multi-chain, multi-Hub, multi-Market asset browser (All Chains / All Hubs / All Markets filters)
+- Deposit and Borrow views
+- Activity tracking (LiquidatedActivity, UsingAsCollateralActivity, UpdatedDynamicConfigActivity, UpdatedRiskPremiumActivity, TokenSwapActivity)
+- Position swap support (SupplySwap, BorrowSwap, WithdrawSwap)
+
+### Stable Vaults (not a V4 Spoke)
+
+Stable Vaults is a **separate Aave product** that embeds fixed-rate stablecoin yield into financial products. It is **not** a V4 Spoke — it does not appear in the Hub-Spoke model. Do not confuse it with V3's deprecated Stable Rate Borrowing.
+
+**How it achieves fixed-rate yield:**
+
+```
+User deposits stablecoin → Stable Vault (Accounting Chain, e.g. Arbitrum)
+                              ↓
+                        SubVault (fixed per-second rate)
+                              ↓
+                        Allocator (deploys to yield strategies)
+                              ↓
+                        ERC-4626 adapters (Aave V3, V4, sGHO, Veda, etc.)
+```
+
+- **SubVault**: Each deposit accrues at a fixed per-second rate. Returns stay predictable regardless of underlying market rate movements.
+- **Off-chain rebalancer**: Continuously optimizes allocations across approved ERC-4626 yield adapters to sustain committed rates.
+- **Surplus/deficit absorption**: If market yield > stable rate → surplus accumulates (sweepable to treasury). If market yield < stable rate → system absorbs the shortfall; principal is always guaranteed.
+- **Multi-asset**: Deposit USDC, withdraw USDT (1:1 exchange enforced at contract level; slippage covered by external Slippage Coverage Vault, not user deposits).
+- **Multi-chain**: Accounting Chain (Arbitrum) + Earning Chains (Ethereum), connected via CCIP/LayerZero/Hyperlane/Across. Chainlink oracle publishes balance snapshots.
+- **Powering Aave App**: Stable Vaults powers the Aave App (iOS) earn experience.
+
+> Source: `aave.com/stable-vaults`, `aave.com/docs/vaults/stable-vaults/architecture`
 
 ### Why "E-Mode Spoke" and "Isolation Spoke" are incorrect
 
