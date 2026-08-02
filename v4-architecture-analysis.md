@@ -129,9 +129,24 @@ V4 官方 Address Book（`aave.com/docs/resources/addresses`）在 SPOKES 分类
 - `transfer` = 将费用转移到指定的金库目标地址
 - 不在 pro.aave.com 界面显示——是费用基础设施，不是用户市场
 
+**与 DAO Collector 的关系**：
+
+通过 aave-address-book（`github.com/aave-dao/aave-address-book` 的 `safe.csv`）确认：
+
+| 实体 | 地址 | Etherscan 标签 | 余额 | 活跃度 |
+|------|------|----------------|------|--------|
+| DAO Collector (V3) | `0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c` | Aave: Treasury Collector V2 | 445 ETH + >$22M tokens (295 种) | 315 笔交易，5 天前最后活动 |
+| Treasury Spoke (V4) | `0xB9B0b8616f6Bf6841972a52058132BE08d723155` | Aave: Treasury Spoke | 0 ETH | 1 笔交易（Transfer Ownership，131 天前） |
+
+**结论**：
+- DAO Collector 和 Treasury Spoke 是**不同地址、不同合约、不同协议版本的费率收取器**
+- V3 费用 → DAO Collector（`0x464C...18c`），已运行 5 年+，持有 $23M+ 资产
+- V4 费用 → Treasury Spoke（`0xB9B0...3155`），尚未激活（0 余额 0 交易）
+- 治理论坛提到的 "budget / asset-holding SAFEs"（金库 SAFE 多签钱包）地址**未在 aave-address-book 中公开**
+
 **与 Stable Vaults FAQ 中 "the treasury" 的关系**：
 
-Treasury Spoke 是 V4 协议费用的**收取端**（source），Stable Vaults FAQ 中的 "the treasury" 是盈余的**去向端**（destination）。它们可能指向同一个 DAO 金库地址，但 Treasury Spoke 是费用收取机制，Stable Vaults 的 "the treasury" 是盈余提取目标——两者角色不同，是否为同一实体无法从现有文档确认。
+Stable Vaults FAQ 原文提到 *"sweep the surplus to the treasury"*，"the treasury" 最可能指 DAO Collector（`0x464C...18c`）或由它资助的 budget SAFE。但 Stable Vaults 是独立产品层，"the treasury" 也可能指其自己的金库机制。**无法从现有文档 100% 确认**。
 
 > 另一个治理话题（`governance.aave.com/t/arfc-aave-will-win-framework/24352`）提到 CoW Swap UI 费用路由"operates through a different mechanism than V4 Treasury Spoke fee collection"，确认 Treasury Spoke 专责 V4 协议费用收取。
 
