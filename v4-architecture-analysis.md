@@ -112,34 +112,34 @@ V4 uses multiple Hubs per chain. As of 2026-08-01, 4 Hubs are deployed:
 | Avalanche | Core | Forex | 3 | 1.044 |
 | Avalanche | Core | AVAX Correlated | 2 | — |
 
-### Treasury Spoke (用途未知)
+### Treasury Spoke（V4 协议费用收取器）
 
-V4 官方 Address Book（`aave.com/docs/resources/addresses`）在 SPOKES 分类下列出了 **Treasury Spoke**：
+V4 官方 Address Book（`aave.com/docs/resources/addresses`）在 SPOKES 分类下列出了 **Treasury Spoke**（`0xB9B0b8616f6Bf6841972a52058132BE08d723155`）。
 
-- 名称: Treasury Spoke
-- 地址: `0xB9B0b8616f6Bf6841972a52058132BE08d723155`
-- **官方文档没有提供任何描述**
+**治理论坛确认的用途**（`governance.aave.com/t/aave-v4-testnet-and-codebase-are-live/23435`，2025-11）：
 
-> ⚠️ **官方文档只列了名称和地址，没有解释 Treasury Spoke 是什么、做什么。以下 ABI 信息来自 Etherscan 合约分析，是技术推断，不代表官方立场。**
+> "The Treasury Spoke: acts as the **Liquidity Fee collector**, routing protocol fees to the designated treasury destination."
 
-**Etherscan 合约分析**（非官方文档）：
-- Proxy: `0xB9B0b8616f6Bf6841972a52058132BE08d723155`
-- Implementation: `0xECc0B581F2E7a5D9eB79b01a4972475f03F2076e`
-- ABI 有 `supply`/`withdraw`/`transfer`，无 `borrow`/`repay`/`liquidationCall`
-- 0 ETH 余额，0 reserves，1 笔交易（Transfer Ownership）
-- 不在 pro.aave.com 界面显示
+> ⚠️ 注意：这是 testnet 阶段的描述。主网部署后功能可能已扩展或调整，以 ABI 分析为补充。
+
+**Etherscan 合约分析**（与治理论坛描述一致）：
+- ABI 有 `supply`/`supplySkimmed`/`withdraw`/`transfer`，无 `borrow`/`repay`/`liquidationCall`
+- `supply`/`supplySkimmed` = 将收取的费用存入 Hub
+- `withdraw` = 从 Hub 提取费用
+- `transfer` = 将费用转移到指定的金库目标地址
+- 不在 pro.aave.com 界面显示——是费用基础设施，不是用户市场
 
 **与 Stable Vaults FAQ 中 "the treasury" 的关系**：
 
-Stable Vaults FAQ 原文提到 *"sweep the surplus to the treasury"*，但：
-- V4 Address Book 没有单独的 "DAO Treasury" 地址，只有 "Treasury Spoke"
-- Stable Vaults 是独立产品层（非 V4 协议功能），它的 "the treasury" 指代不明
-- **无法从现有文档确认 Treasury Spoke 是否就是 Stable Vaults FAQ 中的 "the treasury"**
+Treasury Spoke 是 V4 协议费用的**收取端**（source），Stable Vaults FAQ 中的 "the treasury" 是盈余的**去向端**（destination）。它们可能指向同一个 DAO 金库地址，但 Treasury Spoke 是费用收取机制，Stable Vaults 的 "the treasury" 是盈余提取目标——两者角色不同，是否为同一实体无法从现有文档确认。
+
+> 另一个治理话题（`governance.aave.com/t/arfc-aave-will-win-framework/24352`）提到 CoW Swap UI 费用路由"operates through a different mechanism than V4 Treasury Spoke fee collection"，确认 Treasury Spoke 专责 V4 协议费用收取。
 
 **V3 vs V4 对比**：
 
 | 维度 | V3 | V4 |
 |------|-----|-----|
+| 协议费用收取 | Collector 合约（`collectProtocolFee`，V3 Pool 合约内置） | **Treasury Spoke**（独立 Spoke 合约，收取 Hub 的 `liquidityFee` 并路由到金库） |
 | 协议原生固定利率 | Stable Rate Borrowing（V3.2.0 已废弃，借款端固定利率） | **无**。V4 只有 utilization curve 变动利率 |
 | 固定利率产品 | 无 | 无。Stable Vaults 是独立产品层，同时使用 V3、V4、sGHO、Veda 作为底层收益策略（见下方证据） |
 
