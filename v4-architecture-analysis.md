@@ -149,7 +149,16 @@ Stable Vaults 是一个独立"收支账户"，有自己的资产和负债：
 |------|-----|-----|
 | 金库投资工具 | 无专用合约——DAO 通过治理直接操作 Pool | **Treasury Spoke** — 简化版 Spoke，只 supply/withdraw 不 borrow |
 | 金库角色 | 治理直接参与 | 治理 + 自动化（Treasury Spoke 可升级，支持 supplySkimmed 自动收取收益） |
-| 固定利率产品 | Stable Rate Borrowing（V3.2.0 已废弃，借款端固定利率） | Stable Vaults（独立产品，存款端固定利率，非 V4 Spoke） |
+| 协议原生固定利率 | Stable Rate Borrowing（V3.2.0 已废弃，借款端固定利率） | **无**。V4 只有 utilization curve 变动利率，协议层面不提供固定利率 |
+| 固定利率产品 | 无 | 无。Stable Vaults 是独立产品层（非 V3 或 V4 协议功能），同时使用 V3、V4、sGHO、Veda 作为底层收益策略 |
+
+> **"cover what it owes" 原文出处**（`aave.com/stable-vaults` FAQ）：
+>
+> Q: What happens if the yield earned differs from the yield paid to depositors?
+>
+> A: The vault continuously tracks its assets against its obligations to depositors. If earned yield falls short, principal is always guaranteed and an authorized party can top up the system to keep every user's earned interest fully withdrawable; if assets exceed obligations, an authorized caller may sweep the surplus to the treasury—though never in a way that would leave the vault unable to cover what it owes.
+>
+> 这里的 "the vault" = Stable Vaults，"what it owes" = Stable Vaults 对用户的固定利率负债。不是 DAO 金库的负债。
 
 **Key observation**: The same Spoke name (e.g., Bluechip, Ethena Ecosystem, USDG Pendle) can connect to different Hubs with different Reserves. This is by design — a Spoke connects to one or more Hubs.
 
@@ -187,7 +196,7 @@ User deposits stablecoin → Stable Vault (Accounting Chain, e.g. Arbitrum)
 - **Off-chain rebalancer**: Continuously optimizes allocations across approved ERC-4626 yield adapters to sustain committed rates.
 - **Surplus/deficit absorption (3-layer defense)**:
   1. **Off-chain rebalancer** (Manager role): First line — continuously moves allocations to higher-yielding approved strategies when one strategy's yield drops.
-  2. **Surplus buffer**: When market yield > stable rate, surplus accumulates. This buffer is consumed first when market yield < stable rate. An authorized caller may sweep surplus to the DAO treasury, but "never in a way that would leave the vault unable to cover what it owes" — here "what it owes" = Stable Vaults' fixed-rate obligations to depositors (its liabilities), not the DAO treasury's liabilities.
+  2. **Surplus buffer**: When market yield > stable rate, surplus accumulates. This buffer is consumed first when market yield < stable rate. An authorized caller may sweep surplus to the DAO treasury, but "never in a way that would leave the vault unable to cover what it owes" (see Treasury Spoke section above for full quote and context).
   3. **DAO treasury top-up**: If surplus is exhausted, the Aave DAO treasury (governance-controlled fund, not a contract) votes to inject capital to keep all earned interest fully withdrawable. This is a governance decision, not contract-enforced. **Principal is always guaranteed** — even if all yield strategies fail to earn anything, depositors get their principal back.
 - **Multi-asset**: Deposit USDC, withdraw USDT (1:1 exchange enforced at contract level; slippage covered by external Slippage Coverage Vault, not user deposits).
 - **Multi-chain**: Accounting Chain (Arbitrum) + Earning Chains (Ethereum), connected via CCIP/LayerZero/Hyperlane/Across. Chainlink oracle publishes balance snapshots.
