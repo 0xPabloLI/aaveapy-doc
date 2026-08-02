@@ -114,43 +114,55 @@ V4 uses multiple Hubs per chain. As of 2026-08-01, 4 Hubs are deployed:
 
 ### Treasury Spoke & Aave DAO Treasury (金库)
 
-V4 引入了 **Treasury Spoke**（金库 Spoke）——一个简化版 Spoke，用于 Aave DAO 金库的资产管理。理解它需要区分两个概念：
+V4 官方 Address Book（`aave.com/docs/resources/addresses`）列出了一个 **Treasury Spoke**（`0xB9B0b8616f6Bf6841972a52058132BE08d723155`），与其他 V4 Spoke 并列。但**官方文档没有解释 Treasury Spoke 是什么、做什么**。
 
-| 中文名 | 英文名 | 是什么 | 有负债？ |
-|--------|--------|--------|:--------:|
-| Aave DAO 金库 | Aave DAO Treasury | DAO 治理控制的总资金池（多签钱包），不是某个特定合约 | 无合约层面负债 |
-| Treasury Spoke | Treasury Spoke | V4 合约 `0xB9B0b8616f6Bf6841972a52058132BE08d723155`，金库用来投资 V4 Hub 赚收益的工具 | 无（只有 supply/withdraw，无 borrow） |
-| Stable Vaults | Stable Vaults | 独立产品，对用户承诺固定利率 | 有——对用户的固定利率承诺是负债 |
+区分三个概念：
 
-**Treasury Spoke 合约详情**（Etherscan ABI 分析）：
+| 中文名 | 英文名 | 官方文档怎么说 | ABI 分析怎么说 |
+|--------|--------|----------------|----------------|
+| Aave DAO 金库 | Aave DAO Treasury | 无直接文档——Stable Vaults FAQ 提到"sweep surplus to the treasury" | — |
+| Treasury Spoke | Treasury Spoke | Address Book 列出名称+地址，无描述 | 有 `supply`/`withdraw`/`transfer`，无 `borrow`/`repay`（Etherscan ABI） |
+| Stable Vaults | Stable Vaults | 独立产品，对用户承诺固定利率 | — |
+
+> ⚠️ **不确定性标注**：以下关于 Treasury Spoke 用途的描述是基于 Etherscan ABI 的推断，**未经官方文档确认**。Treasury Spoke 与 Stable Vaults FAQ 中的 "the treasury" 是否为同一实体，也**无法从现有文档确认**。
+
+**Treasury Spoke 合约详情**（Etherscan ABI 分析，非官方文档）：
 - Proxy: `0xB9B0b8616f6Bf6841972a52058132BE08d723155`
 - Implementation: `0xECc0B581F2E7a5D9eB79b01a4972475f03F2076e`
 - ABI 函数: `supply(hub, underlying, amount)`, `supplySkimmed()`, `withdraw()`, `getSuppliedAssets()`, `getSuppliedShares()`, `transfer(token, to, amount)`, `SPOKE_REVISION`
 - **没有** `borrow` / `repay` / `liquidationCall` — 不是用户市场
 - 0 ETH 余额，0 reserves，1 笔交易（Transfer Ownership，131 天前）
-- 不在 pro.aave.com 界面显示 — 基础设施，不是用户产品
+- 不在 pro.aave.com 界面显示
 
-**金库与 Stable Vaults 的关系**：
+**Stable Vaults 中的 "the treasury"**：
+
+Stable Vaults FAQ 原文：*"an authorized caller may sweep the surplus to the treasury—though never in a way that would leave the vault unable to cover what it owes"*
+
+这里的 "the treasury" 指代不明：
+- 可能是 Aave DAO 金库（治理控制的资金池）
+- 也可能就是 Treasury Spoke
+- 官方文档没有明确说明
+
+**Stable Vaults 的负债**（与金库区分）：
 
 Stable Vaults 是一个独立"收支账户"，有自己的资产和负债：
-- **资产** = 部署到 Aave V3/V4/sGHO 等策略的实际收益
+- **资产** = 部署到收益策略的实际收益
 - **负债** = 对用户承诺的固定利率（每秒复利）
 
-当 Stable Vaults 资产 > 负债时（市场收益 > 承诺利率），盈余积累。授权方可以把盈余提取到金库，但合约约束："never in a way that would leave the vault unable to cover what it owes"（不能提取到无法覆盖对用户负债的程度）。
+当资产 > 负债时，盈余积累。授权方可以把盈余提取到 "the treasury"，但合约约束：不能提取到无法覆盖 Stable Vaults 对用户负债的程度。
 
-当 Stable Vaults 资产 < 负债时（市场收益 < 承诺利率），三层防御：
+当资产 < 负债时，三层防御：
 1. 链下再平衡器调整策略配置
 2. 消耗盈余缓冲
-3. 金库（DAO Treasury）治理投票拨款补充——这是治理决策，不是合约强制
+3. "the treasury" 治理投票拨款补充——这是治理决策，不是合约强制
 
 **V3 vs V4 对比**：
 
 | 维度 | V3 | V4 |
 |------|-----|-----|
-| 金库投资工具 | 无专用合约——DAO 通过治理直接操作 Pool | **Treasury Spoke** — 简化版 Spoke，只 supply/withdraw 不 borrow |
-| 金库角色 | 治理直接参与 | 治理 + 自动化（Treasury Spoke 可升级，支持 supplySkimmed 自动收取收益） |
-| 协议原生固定利率 | Stable Rate Borrowing（V3.2.0 已废弃，借款端固定利率） | **无**。V4 只有 utilization curve 变动利率，协议层面不提供固定利率 |
-| 固定利率产品 | 无 | 无。Stable Vaults 是独立产品层（非 V3 或 V4 协议功能），同时使用 V3、V4、sGHO、Veda 作为底层收益策略 |
+| 金库投资工具 | 无专用合约——DAO 通过治理直接操作 Pool | **Treasury Spoke**（Address Book 列出，ABI 显示 supply/withdraw 不 borrow） |
+| 协议原生固定利率 | Stable Rate Borrowing（V3.2.0 已废弃，借款端固定利率） | **无**。V4 只有 utilization curve 变动利率 |
+| 固定利率产品 | 无 | 无。Stable Vaults 是独立产品层，同时使用 V3、V4、sGHO、Veda 作为底层收益策略（见下方证据） |
 
 > **"cover what it owes" 原文出处**（`aave.com/stable-vaults` FAQ）：
 >
@@ -196,13 +208,16 @@ User deposits stablecoin → Stable Vault (Accounting Chain, e.g. Arbitrum)
 - **Off-chain rebalancer**: Continuously optimizes allocations across approved ERC-4626 yield adapters to sustain committed rates.
 - **Surplus/deficit absorption (3-layer defense)**:
   1. **Off-chain rebalancer** (Manager role): First line — continuously moves allocations to higher-yielding approved strategies when one strategy's yield drops.
-  2. **Surplus buffer**: When market yield > stable rate, surplus accumulates. This buffer is consumed first when market yield < stable rate. An authorized caller may sweep surplus to the DAO treasury, but "never in a way that would leave the vault unable to cover what it owes" (see Treasury Spoke section above for full quote and context).
-  3. **DAO treasury top-up**: If surplus is exhausted, the Aave DAO treasury (governance-controlled fund, not a contract) votes to inject capital to keep all earned interest fully withdrawable. This is a governance decision, not contract-enforced. **Principal is always guaranteed** — even if all yield strategies fail to earn anything, depositors get their principal back.
+  2. **Surplus buffer**: When market yield > stable rate, surplus accumulates. This buffer is consumed first when market yield < stable rate. An authorized caller may sweep surplus to "the treasury", but "never in a way that would leave the vault unable to cover what it owes" (see Treasury Spoke section above for full quote and context).
+  3. **"The treasury" top-up**: If surplus is exhausted, "the treasury" (指代不明，见上方 Treasury Spoke 章节的分析) injects capital to keep all earned interest fully withdrawable. This is a governance decision, not contract-enforced. **Principal is always guaranteed** — even if all yield strategies fail to earn anything, depositors get their principal back.
 - **Multi-asset**: Deposit USDC, withdraw USDT (1:1 exchange enforced at contract level; slippage covered by external Slippage Coverage Vault, not user deposits).
 - **Multi-chain**: Accounting Chain (Arbitrum) + Earning Chains (Ethereum), connected via CCIP/LayerZero/Hyperlane/Across. Chainlink oracle publishes balance snapshots.
 - **Powering Aave App**: Stable Vaults powers the Aave App (iOS) earn experience.
+- **Multi-protocol evidence**: Stable Vaults 同时使用 V3 和 V4 作为收益策略。
+  - 产品页 (`aave.com/stable-vaults`): "Multi protocol: Aave v3, Aave v4, sGHO, Veda, and more."
+  - 开发文档 (`aave.com/docs/vaults/stable-vaults/yield-strategies`): 列出 4 种策略类型 — "Aave V4 Markets"（ERC-4626 adapter wrapping V4 pool positions）、"Aave V3 Markets"（extended AToken vault adapter）、"Savings GHO Vault"、"Generic ERC-4626 Vault"
 
-> Source: `aave.com/stable-vaults`, `aave.com/docs/vaults/stable-vaults/architecture`
+> Source: `aave.com/stable-vaults`, `aave.com/docs/vaults/stable-vaults/architecture`, `aave.com/docs/vaults/stable-vaults/yield-strategies`
 
 ### Why "E-Mode Spoke" and "Isolation Spoke" are incorrect
 
