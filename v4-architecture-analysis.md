@@ -149,12 +149,41 @@ V4 官方 Address Book（`aave.com/docs/resources/addresses`）在 SPOKES 分类
 
 | 实体 | 别名 | 地址 | Etherscan 标签 | 余额 | 活跃度 |
 |------|------|------|----------------|------|--------|
-| DAO Collector (V3) | Aave DAO Treasury / Treasury Collector | `0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c` | Aave: Treasury Collector V2 | 445 ETH + >$22M tokens (295 种) | 315 笔交易，5 天前最后活动 |
-| Treasury Spoke (V4) | V4 Liquidity Fee Collector | `0xB9B0b8616f6Bf6841972a52058132BE08d723155` | Aave: Treasury Spoke | 0 ETH | 1 笔交易（Transfer Ownership，131 天前） |
+| DAO Collector (V3 Ethereum) | Aave DAO Treasury / Treasury Collector | `0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c` | Aave: Treasury Collector V2 | 445 ETH + >$22M tokens (295 种) | 315 笔交易，5 天前最后活动 |
+| Treasury Spoke (V4 Ethereum) | V4 Liquidity Fee Collector | `0xB9B0b8616f6Bf6841972a52058132BE08d723155` | Aave: Treasury Spoke | 0 ETH | 1 笔交易（Transfer Ownership，131 天前） |
+
+**每条链有独立的 Collector**（V3 各链 Collector 地址，来自 aave-address-book `safe.csv`）：
+
+| 链 | chainId | Collector 地址 |
+|----|---------|----------------|
+| Ethereum | 1 | `0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c` |
+| Optimism | 10 | `0xB2289E329D2F85F1eD31Adbb30eA345278F21bcf` |
+| BNB Chain | 56 | `0x25Ec457d1778b0E5316e7f38f3c22baF413F1A8C` |
+| Gnosis | 100 | `0x3e652E97ff339B73421f824F5b03d75b62F1Fb51` |
+| Polygon | 137 | `0xe8599F3cc5D38a9aD6F3684cd5CEa72f10Dbc383` |
+| Monad | 143 | `0x22A14267f9F8bA21D11898F0772e652B09e6A8A1` |
+| Sonic | 146 | `0x1aB55bBdD5DF0782BBCf73553Af93BC6B29A286B` |
+| XLayer | 196 | `0x3E9CfB4FDe8180C48b823C12DD2c4B841843f92E` |
+| ZkSync | 324 | `0xd69Cbda644c6be817AaFb5Fd9174f50C33803B6b` |
+| Metis | 1088 | `0xB5b64c7E00374e766272f8B442Cd261412D4b118` |
+| Base | 8453 | `0xBA9424d650A4F5c80a0dA641254d1AcCE2A37057` |
+| Soneium | 1868 | `0xc7B3cc5F5988613b0D620623C514EDFB32539720` |
+| MegaEth | 4326 | `0x7E195b3fc91fDd51A9CD5070cC044602212Ac983` |
+| Mantle | 5000 | `0x0cd2670339Cd520BF9428Ad881bE60A698aB9B32` |
+| Arbitrum | 42161 | `0x053D55f9B5AF8694c503EB288a1B7E552f590710` |
+| Celo | 42220 | `0xC959439207dA5341B74aDcdAC59016aa9Be7E9E7` |
+| Avalanche | 43114 | `0x5ba7fd868c40c16f7aDfAe6CF87121E13FC2F7a0` |
+| Ink (Whitelabel) | 57073 | `0x9138E2cAdFEB23AFFdc0419F2912CaB8F135dba9` |
+| Linea | 59144 | `0x86E2938daE289763D4e09a7e42c5cCcA62Cf9809` |
+| Plasma | 9745 | `0x5E2d083417D12d4B0824E14Ecd48D26831F4Da7D` |
+| Scroll | 534352 | `0x90eB541e1a431D8a30ED85A77675D1F001128cb5` |
+
+> Ethereum 上 V3 的所有子实例（V2、V2 AMM、V2 Arc、V3、V3 EtherFi、V3 Horizon、V3 Lido）共享同一个 Collector 地址。
+> V4 的 Treasury Spoke 目前只在 Ethereum 上部署（V4 还没有扩展到其他链）。
 
 **结论**：
 - DAO Collector 和 Treasury Spoke 是**不同地址、不同合约、不同协议版本的费率收取器**
-- V3 费用 → DAO Collector（`0x464C...18c`），已运行 5 年+，持有 $23M+ 资产
+- V3 费用 → 各链的 DAO Collector，以太坊主网（`0x464C...18c`）已运行 5 年+，持有 $23M+ 资产
 - V4 费用 → Treasury Spoke（`0xB9B0...3155`），大部分 Reserve 费率为 0%，尚未产生收入
 - 治理论坛提到的 "budget / asset-holding SAFEs"（金库 SAFE 多签钱包）地址**未在 aave-address-book 中公开**
 
