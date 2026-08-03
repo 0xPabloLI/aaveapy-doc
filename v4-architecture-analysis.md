@@ -124,24 +124,38 @@ V4 官方 Address Book（`aave.com/docs/resources/addresses`）在 SPOKES 分类
 
 **Etherscan 合约分析**（与治理论坛描述一致）：
 - ABI 有 `supply`/`supplySkimmed`/`withdraw`/`transfer`，无 `borrow`/`repay`/`liquidationCall`
-- `supply`/`supplySkimmed` = 将收取的费用存入 Hub
+- `supply`/`supplySkimmed` = 将收取的费用存入 Hub / 收取已累积的费用
 - `withdraw` = 从 Hub 提取费用
 - `transfer` = 将费用转移到指定的金库目标地址
 - 不在 pro.aave.com 界面显示——是费用基础设施，不是用户市场
+
+**为什么 Treasury Spoke 余额为 0？**
+
+从 V4 SDK 数据（`data/debug/v4-raw-sdk-response.json`）确认：每个 V4 Reserve 有 `settings.feeReceiver` 和 `settings.liquidityFee` 两个字段。
+
+| feeReceiver | liquidityFee 值 | 说明 |
+|-------------|-----------------|------|
+| Treasury Spoke (`0xB9B0...3155`) | 大多数 = 0%，少数 = 0.10% | 以太坊 V4 主网 |
+| `0x2C4A...13a6` | 0% 到 0.25% | 另一 V4 实例（可能是 Avalanche） |
+
+原因：
+1. **大多数以太坊 V4 Reserve 的 `liquidityFee` 配置为 0**——治理尚未激活协议费率
+2. 少数 Reserve 有 0.10% 费率，但费用可能还在 Hub 中累积，尚未通过 `supplySkimmed()` 提取到 Treasury Spoke
+3. V4 的 TVL 远小于 V3，即使有 0.10% 费率，累积的金额也很小
 
 **与 DAO Collector 的关系**：
 
 通过 aave-address-book（`github.com/aave-dao/aave-address-book` 的 `safe.csv`）确认：
 
-| 实体 | 地址 | Etherscan 标签 | 余额 | 活跃度 |
-|------|------|----------------|------|--------|
-| DAO Collector (V3) | `0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c` | Aave: Treasury Collector V2 | 445 ETH + >$22M tokens (295 种) | 315 笔交易，5 天前最后活动 |
-| Treasury Spoke (V4) | `0xB9B0b8616f6Bf6841972a52058132BE08d723155` | Aave: Treasury Spoke | 0 ETH | 1 笔交易（Transfer Ownership，131 天前） |
+| 实体 | 别名 | 地址 | Etherscan 标签 | 余额 | 活跃度 |
+|------|------|------|----------------|------|--------|
+| DAO Collector (V3) | Aave DAO Treasury / Treasury Collector | `0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c` | Aave: Treasury Collector V2 | 445 ETH + >$22M tokens (295 种) | 315 笔交易，5 天前最后活动 |
+| Treasury Spoke (V4) | V4 Liquidity Fee Collector | `0xB9B0b8616f6Bf6841972a52058132BE08d723155` | Aave: Treasury Spoke | 0 ETH | 1 笔交易（Transfer Ownership，131 天前） |
 
 **结论**：
 - DAO Collector 和 Treasury Spoke 是**不同地址、不同合约、不同协议版本的费率收取器**
 - V3 费用 → DAO Collector（`0x464C...18c`），已运行 5 年+，持有 $23M+ 资产
-- V4 费用 → Treasury Spoke（`0xB9B0...3155`），尚未激活（0 余额 0 交易）
+- V4 费用 → Treasury Spoke（`0xB9B0...3155`），大部分 Reserve 费率为 0%，尚未产生收入
 - 治理论坛提到的 "budget / asset-holding SAFEs"（金库 SAFE 多签钱包）地址**未在 aave-address-book 中公开**
 
 **与 Stable Vaults FAQ 中 "the treasury" 的关系**：
