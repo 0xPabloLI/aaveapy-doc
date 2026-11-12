@@ -131,17 +131,20 @@ V4 官方 Address Book（`aave.com/docs/resources/addresses`）在 SPOKES 分类
 
 **为什么 Treasury Spoke 余额为 0？**
 
-从 V4 SDK 数据（`data/debug/v4-raw-sdk-response.json`）确认：每个 V4 Reserve 有 `settings.feeReceiver` 和 `settings.liquidityFee` 两个字段。
+从 V4 SDK 数据（`data/debug/v4-raw-sdk-response.json`，2026-09-17，92 个以太坊 V4 Reserve）确认：两个字段在 `asset.settings` 下（`feeReceiver`、`liquidityFee`）。`liquidityFee` 是 `PercentNumber`：`value: "0.10"` 与 `normalized: "10.00"` 表达同一个 **10%**，`onChainValue: "1000"` 是 bps。把它读成 0.10% 会让费率小 100 倍。
 
-| feeReceiver | liquidityFee 值 | 说明 |
-|-------------|-----------------|------|
-| Treasury Spoke (`0xB9B0...3155`) | 大多数 = 0%，少数 = 0.10% | 以太坊 V4 主网 |
-| `0x2C4A...13a6` | 0% 到 0.25% | 另一 V4 实例（可能是 Avalanche） |
+| feeReceiver | Reserve 数 | liquidityFee 分布 |
+|-------------|-----------|-------------------|
+| Treasury Spoke `0xB9B0…3155` | 53 | 0% ×22、10% ×24、20% ×21、15% ×6、25% ×2 |
+| `0x2C4A…13a6` | 11 | 0% ×1、10% ×6、20% ×2、15% ×1、25% ×1 |
+| `0xcbd466…` | 6 | 10% ×4、15% ×1、20% ×1 |
 
-原因：
-1. **大多数以太坊 V4 Reserve 的 `liquidityFee` 配置为 0**——治理尚未激活协议费率
-2. 少数 Reserve 有 0.10% 费率，但费用可能还在 Hub 中累积，尚未通过 `supplySkimmed()` 提取到 Treasury Spoke
-3. V4 的 TVL 远小于 V3，即使有 0.10% 费率，累积的金额也很小
+合计 69/92 非 0，区间 10%–25%。所以"大多数以太坊 V4 Reserve 的 `liquidityFee` 为 0"不成立：费率早已配置，0 是占比四分之一的那部分。
+
+余额为 0 的原因：
+1. 费用先在 Hub 侧累积（`$F_{acc}$` 的 unrealized 部分），要经过 `supplySkimmed()` / `withdraw()` 才落到 Treasury Spoke；下方链上状态（0 ETH、1 笔 Transfer Ownership）说明这条提取路径还没跑过
+2. V4 的 TVL 远小于 V3，即使 10% 费率，累积金额也有限
+3. 以太坊上仍有 23/92 个 Reserve 的 `liquidityFee` 为 0
 
 **与 DAO Collector 的关系**：
 

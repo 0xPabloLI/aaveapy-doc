@@ -423,6 +423,17 @@ const rayToPercent = (rateRay: bigint): number =>
 >
 > $$P_{offset} + P = premiumShares \times drawnIndex$$
 
+### 协议费率在两个版本里的位置
+
+| | V3 | V4 |
+|---|---|---|
+| 合约字段 | `ReserveConfigurationMap` 的 `reserveFactor`（bps） | `Asset.liquidityFee`（bps） |
+| 进入计算的环节 | 显式 supply rate 的乘子：`× (1 − reserveFactor / PERCENTAGE_FACTOR)`，扣除部分不发给供应方 | 没有显式 supply rate：`liquidityFee` 计入累计费用 `F_acc`，从 `totalAddedAssets` 里扣，供应方收益体现为 `exchangeRate` 的增长率 |
+| 运行时 API 字段 | `protocolFee`（percent） | `protocolFee`（percent） |
+| 字段缺失时 | 0 | 0 |
+
+两个 SDK 字段映射到同一个运行时字段 `protocolFee`，单位 percent（`PercentNumber.value × 100`）。后端序列化器在费率为 0 时不写出该字段，所以**缺失必须读成 0%，不能读成"没有费率模型"**（AAV-1350）。SDK 路径见 `v3-v4-sdk-field-mapping.md`。
+
 ## 2. 兑换率模型（取代 V3 的 liquidityIndex）
 
 ### 核心公式

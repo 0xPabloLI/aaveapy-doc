@@ -60,7 +60,7 @@
 
 | API field | Type | Frontend | V4 level | V4 SDK path | V3 SDK path |
 |-----------|------|----------|-----------|-------------|-------------|
-| `reserveFactor` | `number`, % | rate calc | **Hub** | `r.asset.settings.liquidityFee.value × 100` | `reserve.borrowInfo?.reserveFactor.value × 100` |
+| `protocolFee` | `number`, % **optional** | rate calc | **Hub** | `r.asset.settings.liquidityFee.value × 100` | `reserve.borrowInfo?.reserveFactor.value × 100` |
 | `variableRateSlope1` | `number`, % | rate calc | **Hub** | `r.asset.settings.slopeBelowOptimal.value × 100` | `reserve.borrowInfo?.variableRateSlope1.value × 100` |
 | `variableRateSlope2` | `number`, % | rate calc | **Hub** | `r.asset.settings.slopeAboveOptimal.value × 100` | `reserve.borrowInfo?.variableRateSlope2.value × 100` |
 | `optimalUsageRate` | `number`, % | Util sheet | **Hub** | `r.asset.settings.optimalUtilizationRate.value × 100` | `reserve.borrowInfo?.optimalUsageRate.value × 100` |
@@ -151,6 +151,8 @@ const variableRateSlope1 = percentNumberToPercent(a?.settings?.slopeBelowOptimal
 - `toFiniteNumber(value)` → `number | null` — safe numeric conversion
 - `percentNumberToPercent(pn)` → V4: `pn.value × 100` (decimal fraction → percent)
 - `percentFromV3(pv)` → V3: `pv.value × 100` (same logic, different SDK type name)
+
+**`protocolFee` 的缺失语义**：字段在 `RuntimeReserveData` 里是可选的，**缺失 = 0%**。后端序列化器（`backend/src/services/marketsApiSerialize.ts`）用真值判断决定是否写出该字段，因此 fee 为 0 的 reserve 在 `/markets` 里看不到 `protocolFee`。消费方必须把"没有这个字段"读成 0，不能读成"没有费率模型"——`AaveV4EthenaEcosystem` 的 USDe 就是这种形态。前端 `hasRateCalcFields` 只检查原生利率曲线需要的 7 个参数，`protocolFee` 不在门槛内（AAV-1350）。
 
 ---
 
