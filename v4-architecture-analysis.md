@@ -75,42 +75,61 @@ A user with positions in multiple Spokes has **completely independent** data in 
 
 > ⚠️ **The original version of this document contained speculative scenarios (E-Mode Spoke, Isolation Spoke) that incorrectly attributed V3 concepts to V4. V4 has no E-Mode or Isolation Mode.**
 
-> **Spoke list is dynamic**: Governance can add, modify, or retire Spokes at any time. The table below reflects on-chain data as of 2026-08-01. It will change.
+> **Spoke list is dynamic**: Governance can add, modify, or retire Spokes at any time. The tables below reflect `/api/markets` data as of 2026-11-12 (124 V4 reserves across 29 `(chain, hub, spoke)` pairs). They will change.
 
 ### Hubs
 
-V4 uses multiple Hubs per chain. As of 2026-08-01, 4 Hubs are deployed:
+V4 uses multiple Hubs per chain. As of 2026-11-12, 6 Hubs are deployed:
 
-| Hub | Chain | Description |
-|-----|-------|-------------|
-| Core Hub | Ethereum, Avalanche | Primary hub, most Spokes connect here |
+| Hub | Chains | Description |
+|-----|--------|-------------|
+| Core Hub | Ethereum, Arc, Avalanche | Primary hub, most Spokes connect here |
 | Plus Hub | Ethereum | Ethena-focused |
 | Prime Hub | Ethereum | Bluechip (higher risk profile) |
 | Global Dollar Hub | Ethereum | USDG-specific |
+| Sentora Hub | Ethereum | Curated spokes (RLUSD Yield, OUSD Yield, Bluechip) |
+| Coinbase Stocks Hub | Base | Single spoke, tokenized-equity collateral |
 
-> Official V4 docs (`aave-v4/liquidity/hubs`) name three: Core, Plus, Prime. The Global Dollar Hub and cross-Hub Spokes are visible in SDK data but not yet in official docs.
+> Official V4 docs (`aave-v4/liquidity/hubs`) name three: Core, Plus, Prime. Global Dollar, Sentora and Coinbase Stocks are visible in the markets payload but not yet in official docs.
+>
+> ⚠️ **A Spoke name is not unique across Hubs.** `Bluechip` exists under Core, Prime *and* Sentora; `USDG Pendle` under Core *and* Global Dollar; `Ethena Ecosystem` under Core *and* Plus. The Hub is part of the Spoke's identity, so anything that keys or matches Spokes by name alone will collide — see `hub-spoke-position-isolation.md` and AAV-1356.
 
-### Actual deployed Spokes (on-chain SDK data, as of 2026-08-01)
+### Actual deployed Spokes (`/api/markets`, as of 2026-11-12)
 
-| Chain | Hub | Spoke | Reserves | targetHealthFactor |
-|-------|-----|-------|----------|-------------------|
-| Ethereum | Core | Main | 14 | 1.24 |
-| Ethereum | Core | Bluechip | 4 | 1.174 |
-| Ethereum | Core | Gold | 8 | 1.307 |
-| Ethereum | Core | Lombard | 3 | 1.061 |
-| Ethereum | Core | Forex | 7 | 1.044 |
-| Ethereum | Core | Ethena Ecosystem | 3 | 1.033 |
-| Ethereum | Core | USDG Pendle | 1 | 1.027 |
-| Ethereum | Core | Lido | 2 | 1.013 |
-| Ethereum | Core | Etherfi | 2 | 1.019 |
-| Ethereum | Core | Kelp | 2 | 1.021 |
-| Ethereum | Plus | Ethena Ecosystem | 7 | 1.033 |
-| Ethereum | Plus | Ethena Correlated | 4 | 1.027 |
-| Ethereum | Prime | Bluechip | 7 | 1.174 |
-| Ethereum | Global Dollar | USDG Pendle | 3 | 1.027 |
-| Avalanche | Core | Main | 6 | 1.24 |
-| Avalanche | Core | Forex | 3 | 1.044 |
-| Avalanche | Core | AVAX Correlated | 2 | — |
+| Chain | Hub | Spoke | Reserves |
+|-------|-----|-------|----------|
+| Ethereum | Core | Main | 15 |
+| Ethereum | Core | Bluechip | 5 |
+| Ethereum | Core | Gold | 8 |
+| Ethereum | Core | Lombard | 3 |
+| Ethereum | Core | Forex | 7 |
+| Ethereum | Core | Ethena Ecosystem | 3 |
+| Ethereum | Core | USDG Pendle | 1 |
+| Ethereum | Core | Maple SyrupUSDG | 1 |
+| Ethereum | Core | Lido | 2 |
+| Ethereum | Core | Etherfi | 2 |
+| Ethereum | Core | Kelp | 2 |
+| Ethereum | Plus | Ethena Ecosystem | 7 |
+| Ethereum | Plus | Ethena Correlated | 4 |
+| Ethereum | Prime | Bluechip | 7 |
+| Ethereum | Global Dollar | USDG Pendle | 4 |
+| Ethereum | Global Dollar | Maple SyrupUSDG | 3 |
+| Ethereum | Global Dollar | PAXG Gold | 3 |
+| Ethereum | Global Dollar | Gold Correlated | 2 |
+| Ethereum | Sentora | RLUSD Yield | 5 |
+| Ethereum | Sentora | OUSD Yield | 5 |
+| Ethereum | Sentora | Bluechip | 4 |
+| Arc | Core | Main | 4 |
+| Arc | Core | Forex | 2 |
+| Arc | Core | Maple SyrupUSDC | 2 |
+| Base | Coinbase Stocks | Coinbase Stocks | 9 |
+| Avalanche | Core | Main | 6 |
+| Avalanche | Core | Ethena Ecosystem | 3 |
+| Avalanche | Core | Forex | 3 |
+| Avalanche | Core | AVAX Correlated | 2 |
+
+> The `targetHealthFactor` column this table used to carry is not in the `/api/markets` payload, so it is omitted rather than carried forward unverified. The 2026-08-01 snapshot that had it is in this file's git history.
+
 
 ### Treasury Spoke（V4 协议费用收取器）
 
