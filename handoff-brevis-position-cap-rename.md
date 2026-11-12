@@ -49,6 +49,19 @@ eligiblePosition = min(supplyPosition + borrowPosition, positionCap)
 
 ---
 
+## 抓取链路（2026-11-12 更新，AAV-1365）
+
+`positionCapUsd` 不是 Brevis API 字段：`extractPositionCapFromDescription()` 从 Brevis 前端 `_app` chunk 的 campaign 文案里刮数字，所以**文案就是契约**。原实现把文案当常量（单条正则 + 两个字面量锚点），改词即静默返回 `null`，前端随即按名义 APR 显示。现已加固（`packages/aave-fetcher/src/brevis-api.ts`）：
+
+- 句式候选表 `POSITION_CAP_PATTERNS`（p1–p5）+ 择优 `isBetterCandidate`（句式具体程度 → 持仓上下文 → 出现位置），并加 `<=0 || >1e9` 量级闸门。
+- 锚点候选表 `COPY_START_MARKERS` / `COPY_END_MARKERS`，全缺才放弃。
+- `isMetaMaskCampaignFamily()` 归属门：抓来的 cap 只给名字含 MetaMask 的 campaign，避免第二族 campaign 继承别人的上限。
+- 失败上报：`brevis_position_cap_extraction_failed`（带 campaignId / chainId / 命中句式 / 锚点对 / 文案片段）、`brevis_campaign_family_without_copy`。
+
+实测文案（2026-11-12）：*"This promotional rate applies to a combined total of up to 5000 USDC in collateral and/or debt per user."* —— 与下面 §2.5 的铁证一致。**待补**：定时 live CI 检查（抓真页面断言锚点与 cap），见 AAV-1365 的「后续」。
+
+---
+
 ## 前端工作 🔲
 
 ### 1. 重命名字段
